@@ -1,0 +1,46 @@
+name: Labeler
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure labels exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          labels=(
+          "core:e99695:NestJS control plane"
+          "core/db:f2c4c0:Schema and migrations"
+          "core/auth:f2c4c0:Auth and guards"
+          "core/shared:f2c4c0:Shared code in core"
+          "worker:6c5ce7:Go load generator"
+          "worker/engine:c5bff5:Executors, rate limiter, HTTP client"
+          "worker/metrics:c5bff5:Percentiles and snapshots"
+          "worker/templating:c5bff5:Placeholders and extraction"
+          "worker/transport:c5bff5:Entry point, RabbitMQ, Redis"
+          "test:ff69b4:Unit and E2E tests"
+          "deps:0366d6:Dependencies"
+          "devops:006b75:Infrastructure and CI/CD"
+          "docs:0075ca:Documentation"
+          )
+          for label in "${labels[@]}"; do
+            IFS=":" read -r name color desc <<< "$label"
+            gh label create "$name" --color "$color" --description "$desc" --repo ${{ github.repository }} || true
+          done
+
+      - name: Run labeler
+        uses: actions/labeler@v7
+        with:
+          sync-labels: true

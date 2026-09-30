@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev, 'feat/**', 'fix/**', 'refactor/**', 'chore/**', 'perf/**', 'build/**','ci/**']
+    paths-ignore: ['**.md', 'infra/**', '.gitignore', 'docker-compose.yml']
+  pull_request:
+    branches: [main, dev]
+    paths-ignore: [ '**.md', 'infra/**']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: Core
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/core
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: apps/core/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check Formatting
+        run: pnpm run format:check
+
+      - name: Run Lint
+        run: pnpm run lint
+
+      - name: Type Check
+        run: pnpm exec tsc --noEmit
+
+      - name: Run Tests
+        run: pnpm run test
+
+  worker:
+    name: Worker
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/worker
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/worker/go.mod
+          cache-dependency-path: apps/worker/go.sum
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
