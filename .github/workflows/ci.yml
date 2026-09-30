@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, dev, 'feat/**', 'fix/**', 'refactor/**', 'chore/**', 'perf/**', 'build/**','ci/**']
+    branches: [main, dev]
     paths-ignore: ['**.md', 'infra/**', '.gitignore', 'docker-compose.yml']
   pull_request:
     branches: [main, dev]
