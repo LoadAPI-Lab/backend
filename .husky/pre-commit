@@ -1,0 +1,5 @@
+# IDE sometimes start git without the shell PATH, so add the usual Go install locations
+export PATH="$PATH:/usr/local/go/bin:/usr/lib/go/bin:/opt/homebrew/bin:/usr/local/bin:/snap/bin:$HOME/go/bin"
+
+
+pnpm lint-staged

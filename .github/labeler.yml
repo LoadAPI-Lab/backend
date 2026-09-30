@@ -1,0 +1,81 @@
+# ---------- core  ----------
+core:
+  - changed-files:
+      - all-globs-to-any-file:
+          - 'apps/core/**'
+          - '!apps/core/**/*.spec.ts'
+          - '!apps/core/test/**'
+
+core/db:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'apps/core/migrations/**'
+          - 'apps/core/drizzle.config.ts'
+          - 'apps/core/libs/database/**/*'
+          - 'apps/core/src/shared/entities/**/*'
+
+core/auth:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/core/src/auth/**'
+
+core/shared:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/core/src/shared/**'
+
+# ---------- worker ----------
+worker:
+  - changed-files:
+      - all-globs-to-any-file:
+          - 'apps/worker/**'
+          - '!apps/worker/**/*_test.go'
+
+worker/engine:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'apps/worker/internal/executor/**'
+          - 'apps/worker/internal/ratelimiter/**'
+          - 'apps/worker/internal/httpclient/**'
+
+worker/metrics:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/worker/internal/metrics/**'
+
+worker/templating:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'apps/worker/internal/template/**'
+          - 'apps/worker/internal/extractor/**'
+
+worker/transport:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'apps/worker/cmd/**'
+          - 'apps/worker/internal/publisher/**'
+
+# ---------- shared ----------
+test:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'apps/core/**/*.spec.ts'
+          - 'apps/core/test/**'
+          - 'apps/worker/**/*_test.go'
+
+deps:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/package.json'
+          - '**/pnpm-lock.yaml'
+          - 'apps/worker/go.mod'
+          - 'apps/worker/go.sum'
+
+devops:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - 'infra/**'
+          - '**/Dockerfile*'
+          - '**/.dockerignore'
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file: ['**/*.md', 'LICENSE']
