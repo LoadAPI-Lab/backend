@@ -6,17 +6,31 @@ import (
 	"math/rand/v2"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
-var placeholderRe = regexp.MustCompile(`\{\{\$(\w+)\}\}`)
+var placeholderRe = regexp.MustCompile(`\{\{\$?\w+\}\}`)
 
 func Resolve(s string) string {
+	return ResolveWithVars(s, nil)
+}
+
+func ResolveWithVars(s string, vars map[string]string) string {
 	return placeholderRe.ReplaceAllStringFunc(s, func(match string) string {
-		name := match[3 : len(match)-2]
-		if v, ok := generate(name); ok {
+		name := match[2 : len(match)-2]
+
+		if generatorName, isGenerator := strings.CutPrefix(name, "$"); isGenerator {
+			if v, ok := generate(generatorName); ok {
+				return v
+			}
+			return match
+		}
+
+		if v, ok := vars[name]; ok {
 			return v
 		}
+
 		return match
 	})
 }
