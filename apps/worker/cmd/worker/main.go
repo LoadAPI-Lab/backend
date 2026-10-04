@@ -13,12 +13,54 @@ import (
 )
 
 func main() {
+	// raw := []byte(`{
+	// 	"testId": "demo-1",
+	// 	"type": "single",
+	// 	"config": {
+	// 		"target": {"method": "GET", "url": "https://example.com"},
+	// 		"loadProfile": {"targetRps": 5, "durationSeconds": 30}
+	// 	}
+	// }`)
+
 	raw := []byte(`{
-		"testId": "demo-1",
-		"type": "single",
-		"config": {
-			"target": {"method": "GET", "url": "https://example.com"},
-			"loadProfile": {"targetRps": 5, "durationSeconds": 30}
+	"testId": "demo-scenario-1",
+	"type": "scenario",
+	"config": {
+		"steps": [
+			{
+				"target": {
+					"method": "POST",
+					"url": "https://api.example.com/auth/login",
+					"headers": {"Content-Type": "application/json"},
+					"body": "{\"email\":\"demo@example.com\",\"password\":\"secret\"}"
+				},
+				"extract": [{"name": "accessToken", "path": "accessToken"}]
+			},
+			{
+				"target": {
+					"method": "POST",
+					"url": "https://api.example.com/tasks",
+					"headers": {"Content-Type": "application/json", "Authorization": "Bearer {{accessToken}}"},
+					"body": "{\"title\":\"task-{{$uuid}}\",\"priority\":{{$randomInt}}}"
+				},
+				"extract": [{"name": "taskId", "path": "data.id"}]
+			},
+			{
+				"target": {
+					"method": "GET",
+					"url": "https://api.example.com/tasks/{{taskId}}",
+					"headers": {"Authorization": "Bearer {{accessToken}}"}
+				}
+			},
+			{
+				"target": {
+					"method": "PATCH",
+					"url": "https://api.example.com/tasks/{{taskId}}",
+					"headers": {"Content-Type": "application/json", "Authorization": "Bearer {{accessToken}}"},
+					"body": "{\"status\":\"done\"}"
+					}
+				}
+			]
 		}
 	}`)
 
