@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 	"worker/internal/extractor"
@@ -27,33 +28,68 @@ func New(testId string, cfg Config) *Executor {
 
 func (e *Executor) Run(ctx context.Context, publisher metrics.Publisher) error {
 	vars := make(map[string]string)
+	results := make([]StepResult, 0, len(e.cfg.Steps))
 
 	for _, step := range e.cfg.Steps {
+		if missing := missingVariables(step.Target, vars); len(missing) > 0 {
+			results = append(results, StepResult{
+				Status:      StepStatusSkipped,
+				Description: "undefined variables: " + strings.Join(missing, ", "),
+			})
+			continue
+		}
+
 		target := resolveTarget(step.Target, vars)
-		respBody, err := e.doRequest(ctx, target)
 
+		start := time.Now()
+		statusCode, respBody, err := e.doRequest(ctx, target)
+		durationMs := float64(time.Since(start)) / float64(time.Millisecond)
+
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		if err != nil {
-			return err
+			results = append(results, StepResult{
+				Status:      StepStatusFailed,
+				StatusCode:  statusCode,
+				DurationMs:  durationMs,
+				Description: err.Error(),
+			})
+			continue
+		}
+		if statusCode >= 400 {
+			results = append(results, StepResult{
+				Status:      StepStatusFailed,
+				StatusCode:  statusCode,
+				DurationMs:  durationMs,
+				Description: fmt.Sprintf("unexpected status %d", statusCode),
+			})
+			continue
+		}
+		if err := extractVariables(respBody, step.Extract, vars); err != nil {
+			results = append(results, StepResult{
+				Status:      StepStatusFailed,
+				StatusCode:  statusCode,
+				DurationMs:  durationMs,
+				Description: err.Error(),
+			})
+			continue
 		}
 
-		for _, rule := range step.Extract {
-			v, err := extractor.Extract(respBody, rule.Path)
-			if err != nil {
-				return fmt.Errorf("extract %q: %w", rule.Name, err)
-			}
-			vars[rule.Name] = v
-		}
+		results = append(results, StepResult{
+			Status:     StepStatusOK,
+			StatusCode: statusCode,
+			DurationMs: durationMs,
+		})
 	}
 
 	return nil
 }
 
-func (e *Executor) doRequest(ctx context.Context, target job.Target) ([]byte, error) {
-	body := template.Resolve(target.Body)
-
-	req, err := http.NewRequestWithContext(ctx, target.Method, target.URL, strings.NewReader(body))
+func (e *Executor) doRequest(ctx context.Context, target job.Target) (int, []byte, error) {
+	req, err := http.NewRequestWithContext(ctx, target.Method, target.URL, strings.NewReader(target.Body))
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
 	for k, v := range target.Headers {
@@ -62,20 +98,16 @@ func (e *Executor) doRequest(ctx context.Context, target job.Target) ([]byte, er
 
 	resp, err := e.client.Do(req)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("http %d", resp.StatusCode)
-	}
-
-	return respBody, nil
+	return resp.StatusCode, respBody, nil
 }
 
 func resolveTarget(target job.Target, vars map[string]string) job.Target {
@@ -90,4 +122,37 @@ func resolveTarget(target job.Target, vars map[string]string) job.Target {
 		Headers: headers,
 		Body:    template.ResolveWithVars(target.Body, vars),
 	}
+}
+
+func missingVariables(target job.Target, vars map[string]string) []string {
+	texts := []string{target.URL, target.Body}
+	for _, v := range target.Headers {
+		texts = append(texts, v)
+	}
+
+	var missing []string
+	for _, text := range texts {
+		for _, name := range template.VariableNames(text) {
+			if _, ok := vars[name]; ok {
+				continue
+			}
+			if slices.Contains(missing, name) {
+				continue
+			}
+			missing = append(missing, name)
+		}
+	}
+
+	return missing
+}
+
+func extractVariables(responseBody []byte, rules []ExtractRule, vars map[string]string) error {
+	for _, rule := range rules {
+		value, err := extractor.Extract(responseBody, rule.Path)
+		if err != nil {
+			return fmt.Errorf("extract %q: %w", rule.Name, err)
+		}
+		vars[rule.Name] = value
+	}
+	return nil
 }

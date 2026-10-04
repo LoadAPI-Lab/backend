@@ -11,6 +11,7 @@ import (
 )
 
 var placeholderRe = regexp.MustCompile(`\{\{\$?\w+\}\}`)
+var variableRe = regexp.MustCompile(`\{\{(\w+)\}\}`)
 
 func Resolve(s string) string {
 	return ResolveWithVars(s, nil)
@@ -56,4 +57,13 @@ func newUUID() string {
 	b[6] = (b[6] & 0x0f) | 0x40
 	b[8] = (b[8] & 0x3f) | 0x80
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+func VariableNames(s string) []string {
+	matches := variableRe.FindAllStringSubmatch(s, -1)
+	names := make([]string, 0, len(matches))
+	for _, match := range matches {
+		names = append(names, match[1])
+	}
+	return names
 }
