@@ -6,5 +6,5 @@ import (
 )
 
 type Executor interface {
-	Run(ctx context.Context, publisher metrics.Publisher) error
+	Run(ctx context.Context, publisher metrics.Publisher) (any, error)
 }

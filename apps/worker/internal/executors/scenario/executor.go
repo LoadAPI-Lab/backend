@@ -26,7 +26,7 @@ func New(testId string, cfg Config) *Executor {
 	}
 }
 
-func (e *Executor) Run(ctx context.Context, publisher metrics.Publisher) error {
+func (e *Executor) Run(ctx context.Context, publisher metrics.Publisher) (any, error) {
 	vars := make(map[string]string)
 	results := make([]StepResult, 0, len(e.cfg.Steps))
 
@@ -46,7 +46,7 @@ func (e *Executor) Run(ctx context.Context, publisher metrics.Publisher) error {
 		durationMs := float64(time.Since(start)) / float64(time.Millisecond)
 
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return results, ctx.Err()
 		}
 		if err != nil {
 			results = append(results, StepResult{
@@ -83,7 +83,7 @@ func (e *Executor) Run(ctx context.Context, publisher metrics.Publisher) error {
 		})
 	}
 
-	return nil
+	return results, nil
 }
 
 func (e *Executor) doRequest(ctx context.Context, target job.Target) (int, []byte, error) {
@@ -104,7 +104,7 @@ func (e *Executor) doRequest(ctx context.Context, target job.Target) (int, []byt
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return 0, nil, err
+		return resp.StatusCode, nil, err
 	}
 
 	return resp.StatusCode, respBody, nil

@@ -13,13 +13,9 @@ type Executor struct {
 	limiter *ratelimiter.Limiter
 }
 
-type LoadProfile struct {
-	TargetRPS       int `json:"targetRps"`
-	DurationSeconds int `json:"durationSeconds"`
-	RampUpSeconds   int `json:"rampUpSeconds"`
-}
-
 type Config struct {
-	Target      job.Target  `json:"target"`
-	LoadProfile LoadProfile `json:"loadProfile"`
+	Target          job.Target `json:"target"`
+	TargetRPS       int        `json:"targetRps"`
+	DurationSeconds int        `json:"durationSeconds"`
+	RampUpSeconds   int        `json:"rampUpSeconds"`
 }

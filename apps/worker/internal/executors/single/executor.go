@@ -27,18 +27,18 @@ func New(testId string, cfg Config) *Executor {
 		testId:  testId,
 		cfg:     cfg,
 		client:  httpclient.New(reqTimeout),
-		limiter: ratelimiter.New(cfg.LoadProfile.TargetRPS),
+		limiter: ratelimiter.New(cfg.TargetRPS),
 	}
 }
 
-func (e *Executor) Run(ctx context.Context, publisher metrics.Publisher) error {
-	runCtx, cancel := context.WithTimeout(ctx, time.Duration(e.cfg.LoadProfile.DurationSeconds)*time.Second)
+func (e *Executor) Run(ctx context.Context, publisher metrics.Publisher) (any, error) {
+	runCtx, cancel := context.WithTimeout(ctx, time.Duration(e.cfg.DurationSeconds)*time.Second)
 	defer cancel()
 
 	results := make(chan requestResult, 1024)
 
 	var wg sync.WaitGroup
-	workerCount := workerCountFor(e.cfg.LoadProfile.TargetRPS)
+	workerCount := workerCountFor(e.cfg.TargetRPS)
 	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
 		go func() {
@@ -52,7 +52,7 @@ func (e *Executor) Run(ctx context.Context, publisher metrics.Publisher) error {
 		close(results)
 	}()
 
-	return e.aggregate(ctx, results, publisher)
+	return nil, e.aggregate(ctx, results, publisher)
 }
 
 func (e *Executor) worker(ctx context.Context, results chan<- requestResult) {
@@ -139,7 +139,7 @@ func (e *Executor) snapshot(success, failed int, latencies *metrics.LatencyWindo
 	return metrics.Snapshot{
 		TestId:       e.testId,
 		Timestamp:    time.Now(),
-		RPS:          e.cfg.LoadProfile.TargetRPS,
+		RPS:          e.cfg.TargetRPS,
 		SuccessCount: success,
 		ErrorCount:   failed,
 		P50Ms:        toMs(p50),

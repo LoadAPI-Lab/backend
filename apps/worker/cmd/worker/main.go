@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"worker/internal/executor"
 	"worker/internal/job"
 	"worker/internal/metrics"
 )
@@ -70,21 +69,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	exec, err := executor.New(payload)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "cannot build executor:", err)
-		os.Exit(1)
-	}
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if err := exec.Run(ctx, stdoutPublisher{}); err != nil {
+
+	if err := runTest(ctx, payload, stdoutPublisher{}); err != nil {
 		fmt.Fprintln(os.Stderr, "test run failed:", err)
 		os.Exit(1)
 	}
+
 }
 
 type stdoutPublisher struct{}
+
+func (stdoutPublisher) PublishEvent(ctx context.Context, event any) error {
+	data, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("[event] %s\n", data)
+	return nil
+}
 
 func (stdoutPublisher) Publish(ctx context.Context, snapshot metrics.Snapshot) error {
 	fmt.Printf("[metrics] %+v\n", snapshot)
