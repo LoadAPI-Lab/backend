@@ -56,7 +56,7 @@ func (e *Executor) Run(ctx context.Context) (any, error) {
 		close(results)
 	}()
 
-	return nil, e.aggregate(ctx, results)
+	return e.aggregate(ctx, results)
 }
 
 func (e *Executor) worker(ctx context.Context, results chan<- requestResult) {
@@ -107,7 +107,7 @@ func (e *Executor) doRequest(ctx context.Context) error {
 	return nil
 }
 
-func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) error {
+func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) (load.Result, error) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
@@ -115,28 +115,36 @@ func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) 
 	var success, failed int
 	latencies := metrics.NewLatencyWindow()
 
+	var totalSuccess, totalFailed int
+	totalLatencies := metrics.NewLatencyWindow()
+
 	for {
 		select {
 		case r, ok := <-results:
 			if !ok {
-				return e.publishSnapshot(context.Background(), e.snapshot(start, success, failed, latencies))
+				if err := e.publishSnapshot(context.Background(), e.snapshot(start, success, failed, latencies)); err != nil {
+					return load.Result{}, err
+				}
+				return e.result(start, totalSuccess, totalFailed, totalLatencies), nil
 			}
 
 			if r.err != nil {
 				failed++
+				totalFailed++
 			} else {
 				success++
+				totalSuccess++
 				latencies.Add(r.duration)
+				totalLatencies.Add(r.duration)
 			}
 		case <-ticker.C:
 			if err := e.publishSnapshot(ctx, e.snapshot(start, success, failed, latencies)); err != nil {
-				return err
+				return load.Result{}, err
 			}
 			success, failed = 0, 0
 			latencies.Reset()
 		}
 	}
-
 }
 
 func (e *Executor) snapshot(start time.Time, success, failed int, latencies *metrics.LatencyWindow) load.Snapshot {
@@ -158,6 +166,33 @@ func (e *Executor) snapshot(start time.Time, success, failed int, latencies *met
 		TargetRps:      e.cfg.TargetRPS,
 		ActualRps:      success + failed,
 		Routes:         []load.RouteSnapshot{route},
+	}
+}
+
+func (e *Executor) result(start time.Time, success, failed int, latencies *metrics.LatencyWindow) load.Result {
+	duration := time.Since(start)
+	total := success + failed
+
+	route := load.RouteResult{
+		Method:        e.cfg.Target.Method,
+		URL:           e.cfg.Target.URL,
+		TotalRequests: total,
+		SuccessCount:  success,
+		ErrorCount:    failed,
+	}
+	if total > 0 {
+		route.ErrorRate = float64(failed) / float64(total)
+	}
+	if success > 0 {
+		p50, p95, p99 := latencies.Percentiles()
+		route.ServiceTime = &load.Percentiles{P50Ms: toMs(p50), P95Ms: toMs(p95), P99Ms: toMs(p99)}
+	}
+
+	return load.Result{
+		DurationMs: toMs(duration),
+		TargetRps:  e.cfg.TargetRPS,
+		AvgRps:     float64(total) / duration.Seconds(),
+		Routes:     []load.RouteResult{route},
 	}
 }
 
