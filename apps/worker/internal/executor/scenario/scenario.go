@@ -25,6 +25,8 @@ type Step struct {
 }
 
 type StepResult struct {
+	Method      string     `json:"method"`
+	URL         string     `json:"url"`
 	Status      StepStatus `json:"status"`
 	StatusCode  int        `json:"statusCode,omitempty"`
 	DurationMs  float64    `json:"durationMs,omitempty"`
@@ -38,4 +40,17 @@ type ExtractRule struct {
 
 type Config struct {
 	Steps []Step `json:"steps"`
+}
+
+type Summary struct {
+	TotalSteps   int     `json:"totalSteps"`
+	OkCount      int     `json:"okCount"`
+	FailedCount  int     `json:"failedCount"`
+	SkippedCount int     `json:"skippedCount"`
+	DurationMs   float64 `json:"durationMs"`
+}
+
+type Result struct {
+	Summary Summary      `json:"summary"`
+	Steps   []StepResult `json:"steps"`
 }
