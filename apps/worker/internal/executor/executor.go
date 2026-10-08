@@ -2,9 +2,8 @@ package executor
 
 import (
 	"context"
-	"worker/internal/metrics"
 )
 
 type Executor interface {
-	Run(ctx context.Context, publisher metrics.Publisher) (any, error)
+	Run(ctx context.Context) (any, error)
 }

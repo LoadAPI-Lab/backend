@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"worker/internal/adapter/stdout"
 	"worker/internal/job"
-	"worker/internal/metrics"
 )
 
 func main() {
@@ -73,17 +72,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	live := stdout.Publisher{}
 	results := stdout.Publisher{}
-	if err := runTest(ctx, payload, stdoutPublisher{}, results); err != nil {
+
+	if err := runTest(ctx, payload, live, results); err != nil {
 		fmt.Fprintln(os.Stderr, "test run failed:", err)
 		os.Exit(1)
 	}
 
-}
-
-type stdoutPublisher struct{}
-
-func (stdoutPublisher) Publish(ctx context.Context, snapshot metrics.Snapshot) error {
-	fmt.Printf("[metrics] %+v\n", snapshot)
-	return nil
 }

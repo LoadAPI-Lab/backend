@@ -11,7 +11,6 @@ import (
 	"worker/internal/extractor"
 	"worker/internal/httpclient"
 	"worker/internal/job"
-	"worker/internal/metrics"
 	"worker/internal/template"
 )
 
@@ -26,7 +25,7 @@ func New(testId string, cfg Config) *Executor {
 	}
 }
 
-func (e *Executor) Run(ctx context.Context, publisher metrics.Publisher) (any, error) {
+func (e *Executor) Run(ctx context.Context) (any, error) {
 	vars := make(map[string]string)
 	results := make([]StepResult, 0, len(e.cfg.Steps))
 

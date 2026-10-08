@@ -2,8 +2,10 @@ package single
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"worker/internal/broker"
 	"worker/internal/httpclient"
 	"worker/internal/metrics"
 	"worker/internal/ratelimiter"
@@ -22,16 +24,17 @@ type requestResult struct {
 	err      error
 }
 
-func New(testId string, cfg Config) *Executor {
+func New(testId string, cfg Config, live broker.Publisher) *Executor {
 	return &Executor{
 		testId:  testId,
 		cfg:     cfg,
 		client:  httpclient.New(reqTimeout),
 		limiter: ratelimiter.New(cfg.TargetRPS),
+		live:    live,
 	}
 }
 
-func (e *Executor) Run(ctx context.Context, publisher metrics.Publisher) (any, error) {
+func (e *Executor) Run(ctx context.Context) (any, error) {
 	runCtx, cancel := context.WithTimeout(ctx, time.Duration(e.cfg.DurationSeconds)*time.Second)
 	defer cancel()
 
@@ -52,7 +55,7 @@ func (e *Executor) Run(ctx context.Context, publisher metrics.Publisher) (any, e
 		close(results)
 	}()
 
-	return nil, e.aggregate(ctx, results, publisher)
+	return nil, e.aggregate(ctx, results)
 }
 
 func (e *Executor) worker(ctx context.Context, results chan<- requestResult) {
@@ -103,7 +106,7 @@ func (e *Executor) doRequest(ctx context.Context) error {
 	return nil
 }
 
-func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult, publisher metrics.Publisher) error {
+func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) error {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
@@ -114,7 +117,7 @@ func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult, 
 		select {
 		case r, ok := <-results:
 			if !ok {
-				return publisher.Publish(context.Background(), e.snapshot(success, failed, latencies))
+				return e.publishSnapshot(context.Background(), e.snapshot(success, failed, latencies))
 			}
 
 			if r.err != nil {
@@ -124,7 +127,7 @@ func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult, 
 				latencies.Add(r.duration)
 			}
 		case <-ticker.C:
-			if err := publisher.Publish(ctx, e.snapshot(success, failed, latencies)); err != nil {
+			if err := e.publishSnapshot(ctx, e.snapshot(success, failed, latencies)); err != nil {
 				return err
 			}
 			success, failed = 0, 0
@@ -146,6 +149,14 @@ func (e *Executor) snapshot(success, failed int, latencies *metrics.LatencyWindo
 		P95Ms:        toMs(p95),
 		P99Ms:        toMs(p99),
 	}
+}
+
+func (e *Executor) publishSnapshot(ctx context.Context, snapshot metrics.Snapshot) error {
+	body, err := json.Marshal(snapshot)
+	if err != nil {
+		return err
+	}
+	return e.live.Publish(ctx, "metrics:"+e.testId, body)
 }
 
 func workerCountFor(targetRps int) int {

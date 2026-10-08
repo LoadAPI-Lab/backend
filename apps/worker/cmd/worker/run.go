@@ -9,12 +9,11 @@ import (
 	"worker/internal/event"
 	"worker/internal/executor"
 	"worker/internal/job"
-	"worker/internal/metrics"
 )
 
 const resultsQueue = "test_results"
 
-func runTest(ctx context.Context, payload job.Payload, snapshots metrics.Publisher, results broker.Publisher) error {
+func runTest(ctx context.Context, payload job.Payload, live, results broker.Publisher) error {
 	startedAt := time.Now()
 
 	started := event.NewStarted(payload.TestId, payload.Type, startedAt)
@@ -22,13 +21,13 @@ func runTest(ctx context.Context, payload job.Payload, snapshots metrics.Publish
 		return fmt.Errorf("publish started event: %w", err)
 	}
 
-	exec, err := executor.New(payload)
+	exec, err := executor.New(payload, live)
 	if err != nil {
 		failed := event.NewFailed(payload.TestId, payload.Type, startedAt, time.Now(), err.Error())
 		return publishFinished(ctx, results, failed)
 	}
 
-	result, err := exec.Run(ctx, snapshots)
+	result, err := exec.Run(ctx)
 	finishedAt := time.Now()
 
 	var finished event.Finished
