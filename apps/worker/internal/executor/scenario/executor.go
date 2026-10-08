@@ -26,6 +26,7 @@ func New(testId string, cfg Config) *Executor {
 }
 
 func (e *Executor) Run(ctx context.Context) (any, error) {
+	runStart := time.Now()
 	vars := make(map[string]string)
 	results := make([]StepResult, 0, len(e.cfg.Steps))
 
@@ -45,7 +46,7 @@ func (e *Executor) Run(ctx context.Context) (any, error) {
 		durationMs := float64(time.Since(start)) / float64(time.Millisecond)
 
 		if ctx.Err() != nil {
-			return results, ctx.Err()
+			return newResult(e.cfg.Steps, results, time.Since(runStart)), ctx.Err()
 		}
 		if err != nil {
 			results = append(results, StepResult{
@@ -82,7 +83,7 @@ func (e *Executor) Run(ctx context.Context) (any, error) {
 		})
 	}
 
-	return results, nil
+	return newResult(e.cfg.Steps, results, time.Since(runStart)), nil
 }
 
 func (e *Executor) doRequest(ctx context.Context, target job.Target) (int, []byte, error) {
@@ -121,6 +122,38 @@ func resolveTarget(target job.Target, vars map[string]string) job.Target {
 		Headers: headers,
 		Body:    template.ResolveWithVars(target.Body, vars),
 	}
+}
+
+func newResult(steps []Step, results []StepResult, duration time.Duration) Result {
+	result := Result{
+		Summary: Summary{
+			TotalSteps: len(steps),
+			DurationMs: float64(duration) / float64(time.Millisecond),
+		},
+		Steps: make([]StepResult, len(steps)),
+	}
+
+	for i, step := range steps {
+		stepResult := StepResult{Status: StepStatusSkipped, Description: "test stopped"}
+		if i < len(results) {
+			stepResult = results[i]
+		}
+		stepResult.Method = step.Target.Method
+		stepResult.URL = step.Target.URL
+
+		switch stepResult.Status {
+		case StepStatusOK:
+			result.Summary.OkCount++
+		case StepStatusFailed:
+			result.Summary.FailedCount++
+		case StepStatusSkipped:
+			result.Summary.SkippedCount++
+		}
+
+		result.Steps[i] = stepResult
+	}
+
+	return result
 }
 
 func missingVariables(target job.Target, vars map[string]string) []string {
