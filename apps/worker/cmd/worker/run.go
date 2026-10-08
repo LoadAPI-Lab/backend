@@ -2,37 +2,33 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
+	"worker/internal/broker"
 	"worker/internal/event"
 	"worker/internal/executor"
 	"worker/internal/job"
 	"worker/internal/metrics"
 )
 
-type testPublisher interface {
-	metrics.Publisher
-	PublishEvent(ctx context.Context, e any) error
-}
+const resultsQueue = "test_results"
 
-func runTest(ctx context.Context, payload job.Payload, publisher testPublisher) error {
+func runTest(ctx context.Context, payload job.Payload, snapshots metrics.Publisher, results broker.Publisher) error {
 	startedAt := time.Now()
 
 	started := event.NewStarted(payload.TestId, payload.Type, startedAt)
-	if err := publisher.PublishEvent(ctx, started); err != nil {
+	if err := publishEvent(ctx, results, started); err != nil {
 		return fmt.Errorf("publish started event: %w", err)
 	}
 
 	exec, err := executor.New(payload)
 	if err != nil {
 		failed := event.NewFailed(payload.TestId, payload.Type, startedAt, time.Now(), err.Error())
-		if err := publisher.PublishEvent(context.WithoutCancel(ctx), failed); err != nil {
-			return fmt.Errorf("publish failed event: %w", err)
-		}
-		return nil
+		return publishFinished(ctx, results, failed)
 	}
 
-	result, err := exec.Run(ctx, publisher)
+	result, err := exec.Run(ctx, snapshots)
 	finishedAt := time.Now()
 
 	var finished event.Finished
@@ -45,12 +41,20 @@ func runTest(ctx context.Context, payload job.Payload, publisher testPublisher) 
 		finished = event.NewFinished(payload.TestId, payload.Type, event.StatusCompleted, startedAt, finishedAt, result)
 	}
 
-	return publishFinished(ctx, publisher, finished)
+	return publishFinished(ctx, results, finished)
 }
 
-func publishFinished(ctx context.Context, publisher testPublisher, finished event.Finished) error {
-	if err := publisher.PublishEvent(context.WithoutCancel(ctx), finished); err != nil {
+func publishFinished(ctx context.Context, results broker.Publisher, finished event.Finished) error {
+	if err := publishEvent(context.WithoutCancel(ctx), results, finished); err != nil {
 		return fmt.Errorf("publish finished event: %w", err)
 	}
 	return nil
+}
+
+func publishEvent(ctx context.Context, results broker.Publisher, e any) error {
+	body, err := json.Marshal(e)
+	if err != nil {
+		return err
+	}
+	return results.Publish(ctx, resultsQueue, body)
 }

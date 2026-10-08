@@ -3,8 +3,8 @@ package executor
 import (
 	"encoding/json"
 	"fmt"
-	"worker/internal/executors/scenario"
-	"worker/internal/executors/single"
+	"worker/internal/executor/load/single"
+	"worker/internal/executor/scenario"
 	"worker/internal/job"
 )
 
