@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"worker/internal/broker"
+	"worker/internal/executor/load"
 	"worker/internal/httpclient"
 	"worker/internal/metrics"
 	"worker/internal/ratelimiter"
@@ -110,6 +111,7 @@ func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
+	start := time.Now()
 	var success, failed int
 	latencies := metrics.NewLatencyWindow()
 
@@ -117,7 +119,7 @@ func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) 
 		select {
 		case r, ok := <-results:
 			if !ok {
-				return e.publishSnapshot(context.Background(), e.snapshot(success, failed, latencies))
+				return e.publishSnapshot(context.Background(), e.snapshot(start, success, failed, latencies))
 			}
 
 			if r.err != nil {
@@ -127,7 +129,7 @@ func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) 
 				latencies.Add(r.duration)
 			}
 		case <-ticker.C:
-			if err := e.publishSnapshot(ctx, e.snapshot(success, failed, latencies)); err != nil {
+			if err := e.publishSnapshot(ctx, e.snapshot(start, success, failed, latencies)); err != nil {
 				return err
 			}
 			success, failed = 0, 0
@@ -137,21 +139,29 @@ func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) 
 
 }
 
-func (e *Executor) snapshot(success, failed int, latencies *metrics.LatencyWindow) metrics.Snapshot {
-	p50, p95, p99 := latencies.Percentiles()
-	return metrics.Snapshot{
-		TestId:       e.testId,
-		Timestamp:    time.Now(),
-		RPS:          e.cfg.TargetRPS,
+func (e *Executor) snapshot(start time.Time, success, failed int, latencies *metrics.LatencyWindow) load.Snapshot {
+	route := load.RouteSnapshot{
+		Method:       e.cfg.Target.Method,
+		URL:          e.cfg.Target.URL,
 		SuccessCount: success,
 		ErrorCount:   failed,
-		P50Ms:        toMs(p50),
-		P95Ms:        toMs(p95),
-		P99Ms:        toMs(p99),
+	}
+	if success > 0 {
+		p50, p95, p99 := latencies.Percentiles()
+		route.ServiceTime = &load.Percentiles{P50Ms: toMs(p50), P95Ms: toMs(p95), P99Ms: toMs(p99)}
+	}
+
+	return load.Snapshot{
+		TestId:         e.testId,
+		Timestamp:      time.Now().UTC().Truncate(time.Millisecond),
+		ElapsedSeconds: int(time.Since(start).Seconds()),
+		TargetRps:      e.cfg.TargetRPS,
+		ActualRps:      success + failed,
+		Routes:         []load.RouteSnapshot{route},
 	}
 }
 
-func (e *Executor) publishSnapshot(ctx context.Context, snapshot metrics.Snapshot) error {
+func (e *Executor) publishSnapshot(ctx context.Context, snapshot load.Snapshot) error {
 	body, err := json.Marshal(snapshot)
 	if err != nil {
 		return err
