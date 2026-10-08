@@ -5,11 +5,11 @@ import (
 	"worker/internal/job"
 )
 
-type Kind string
+type Type string
 
 const (
-	KindStarted  Kind = "started"
-	KindFinished Kind = "finished"
+	TypeStarted  Type = "started"
+	TypeFinished Type = "finished"
 )
 
 type Status string
@@ -23,14 +23,14 @@ const (
 type Started struct {
 	TestId    string       `json:"testId"`
 	TestType  job.TestType `json:"testType"`
-	Event     Kind         `json:"event"`
+	EventType Type         `json:"eventType"`
 	Timestamp time.Time    `json:"timestamp"`
 }
 
 type Finished struct {
 	TestId     string       `json:"testId"`
 	TestType   job.TestType `json:"testType"`
-	Event      Kind         `json:"event"`
+	EventType  Type         `json:"eventType"`
 	Status     Status       `json:"status"`
 	Reason     string       `json:"reason,omitempty"`
 	Result     any          `json:"result,omitempty"`
@@ -42,7 +42,7 @@ func NewFinished(testId string, testType job.TestType, status Status, startedAt,
 	return Finished{
 		TestId:     testId,
 		TestType:   testType,
-		Event:      KindFinished,
+		EventType:  TypeFinished,
 		Status:     status,
 		StartedAt:  contractTime(startedAt),
 		FinishedAt: contractTime(finishedAt),
@@ -54,7 +54,7 @@ func NewStarted(testId string, testType job.TestType, at time.Time) Started {
 	return Started{
 		TestId:    testId,
 		TestType:  testType,
-		Event:     KindStarted,
+		EventType: TypeStarted,
 		Timestamp: at.UTC().Truncate(time.Millisecond),
 	}
 }
@@ -63,7 +63,7 @@ func NewFailed(testId string, testType job.TestType, startedAt, finishedAt time.
 	return Finished{
 		TestId:     testId,
 		TestType:   testType,
-		Event:      KindFinished,
+		EventType:  TypeFinished,
 		Status:     StatusFailed,
 		Reason:     reason,
 		StartedAt:  contractTime(startedAt),
