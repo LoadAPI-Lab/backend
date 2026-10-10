@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"sync"
 	"worker/internal/broker"
 	"worker/internal/executor/load"
@@ -60,10 +61,9 @@ func (e *Executor) pace(ctx context.Context, results chan<- requestResult) {
 
 	workers := 0
 	start := time.Now()
-	interval := time.Second / time.Duration(e.cfg.TargetRPS)
 
 	for i := 0; ; i++ {
-		planned := start.Add(time.Duration(i) * interval)
+		planned := start.Add(offset(i, e.cfg.TargetRPS, e.cfg.RampUpSeconds))
 
 		if wait := time.Until(planned); wait > 0 {
 			select {
@@ -189,11 +189,15 @@ func (e *Executor) snapshot(start time.Time, s *stats) load.Snapshot {
 		route.ServiceTime = percentiles(s.serviceTimes)
 	}
 
+	elapsed := time.Since(start)
+	planned := plannedCount(elapsed, e.cfg.TargetRPS, e.cfg.RampUpSeconds) -
+		plannedCount(elapsed-time.Second, e.cfg.TargetRPS, e.cfg.RampUpSeconds)
+
 	return load.Snapshot{
 		TestId:         e.testId,
 		Timestamp:      time.Now().UTC().Truncate(time.Millisecond),
-		ElapsedSeconds: int(time.Since(start).Seconds()),
-		TargetRps:      e.cfg.TargetRPS,
+		ElapsedSeconds: int(elapsed.Seconds()),
+		TargetRps:      int(math.Round(planned)),
 		ActualRps:      s.success + s.failed,
 		Routes:         []load.RouteSnapshot{route},
 	}
