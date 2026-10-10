@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sync"
 	"worker/internal/broker"
 	"worker/internal/executor/load"
 	"worker/internal/httpclient"
@@ -13,11 +14,13 @@ import (
 
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 )
 
-const reqTimeout = 10 * time.Second
+const (
+	reqTimeout = 10 * time.Second
+	maxWorkers = 10_000
+)
 
 type requestResult struct {
 	duration time.Duration
@@ -37,32 +40,22 @@ func (e *Executor) Run(ctx context.Context) (any, error) {
 	runCtx, cancel := context.WithTimeout(ctx, time.Duration(e.cfg.DurationSeconds)*time.Second)
 	defer cancel()
 
-	ticks := make(chan time.Time)
-	go e.pace(runCtx, ticks)
-
 	results := make(chan requestResult, 1024)
-
-	var wg sync.WaitGroup
-	workerCount := workerCountFor(e.cfg.TargetRPS)
-	for i := 0; i < workerCount; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			e.worker(runCtx, ticks, results)
-		}()
-	}
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
+	go e.pace(runCtx, results)
 
 	return e.aggregate(ctx, results)
 }
 
-func (e *Executor) pace(ctx context.Context, ticks chan<- time.Time) {
-	defer close(ticks)
+func (e *Executor) pace(ctx context.Context, results chan<- requestResult) {
+	ticks := make(chan time.Time)
+	var wg sync.WaitGroup
+	defer func() {
+		close(ticks)
+		wg.Wait()
+		close(results)
+	}()
 
+	workers := 0
 	start := time.Now()
 	interval := time.Second / time.Duration(e.cfg.TargetRPS)
 
@@ -75,6 +68,21 @@ func (e *Executor) pace(ctx context.Context, ticks chan<- time.Time) {
 			case <-ctx.Done():
 				return
 			}
+		}
+
+		select {
+		case ticks <- planned:
+			continue
+		default:
+		}
+
+		if workers < maxWorkers {
+			workers++
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				e.worker(ctx, ticks, results)
+			}()
 		}
 
 		select {
