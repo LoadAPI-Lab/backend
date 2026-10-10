@@ -12,15 +12,6 @@ import (
 )
 
 func main() {
-	// raw := []byte(`{
-	// 	"testId": "demo-1",
-	// 	"type": "single",
-	// 	"config": {
-	// 		"target": {"method": "GET", "url": "https://example.com"},
-	// 		"loadProfile": {"targetRps": 5, "durationSeconds": 30}
-	// 	}
-	// }`)
-
 	raw := []byte(`{
 	"testId": "demo-scenario-1",
 	"type": "scenario",

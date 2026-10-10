@@ -55,7 +55,7 @@ func NewStarted(testId string, testType job.TestType, at time.Time) Started {
 		TestId:    testId,
 		TestType:  testType,
 		EventType: TypeStarted,
-		Timestamp: at.UTC().Truncate(time.Millisecond),
+		Timestamp: contractTime(at),
 	}
 }
 
