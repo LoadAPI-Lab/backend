@@ -4,15 +4,13 @@ import (
 	"net/http"
 	"worker/internal/broker"
 	"worker/internal/job"
-	"worker/internal/ratelimiter"
 )
 
 type Executor struct {
-	testId  string
-	cfg     Config
-	client  *http.Client
-	limiter *ratelimiter.Limiter
-	live    broker.Publisher
+	testId string
+	cfg    Config
+	client *http.Client
+	live   broker.Publisher
 }
 
 type Config struct {

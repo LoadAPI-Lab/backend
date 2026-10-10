@@ -9,7 +9,6 @@ import (
 	"worker/internal/executor/load"
 	"worker/internal/httpclient"
 	"worker/internal/metrics"
-	"worker/internal/ratelimiter"
 	"worker/internal/template"
 
 	"net/http"
@@ -27,17 +26,19 @@ type requestResult struct {
 
 func New(testId string, cfg Config, live broker.Publisher) *Executor {
 	return &Executor{
-		testId:  testId,
-		cfg:     cfg,
-		client:  httpclient.New(reqTimeout),
-		limiter: ratelimiter.New(cfg.TargetRPS),
-		live:    live,
+		testId: testId,
+		cfg:    cfg,
+		client: httpclient.New(reqTimeout),
+		live:   live,
 	}
 }
 
 func (e *Executor) Run(ctx context.Context) (any, error) {
 	runCtx, cancel := context.WithTimeout(ctx, time.Duration(e.cfg.DurationSeconds)*time.Second)
 	defer cancel()
+
+	ticks := make(chan time.Time)
+	go e.pace(runCtx, ticks)
 
 	results := make(chan requestResult, 1024)
 
@@ -47,7 +48,7 @@ func (e *Executor) Run(ctx context.Context) (any, error) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			e.worker(runCtx, results)
+			e.worker(runCtx, ticks, results)
 		}()
 	}
 
@@ -59,12 +60,33 @@ func (e *Executor) Run(ctx context.Context) (any, error) {
 	return e.aggregate(ctx, results)
 }
 
-func (e *Executor) worker(ctx context.Context, results chan<- requestResult) {
-	for {
-		if err := e.limiter.Wait(ctx); err != nil {
-			return
+func (e *Executor) pace(ctx context.Context, ticks chan<- time.Time) {
+	defer close(ticks)
+
+	start := time.Now()
+	interval := time.Second / time.Duration(e.cfg.TargetRPS)
+
+	for i := 0; ; i++ {
+		planned := start.Add(time.Duration(i) * interval)
+
+		if wait := time.Until(planned); wait > 0 {
+			select {
+			case <-time.After(wait):
+			case <-ctx.Done():
+				return
+			}
 		}
 
+		select {
+		case ticks <- planned:
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (e *Executor) worker(ctx context.Context, ticks <-chan time.Time, results chan<- requestResult) {
+	for range ticks {
 		start := time.Now()
 		err := e.doRequest(ctx)
 		if ctx.Err() != nil {
