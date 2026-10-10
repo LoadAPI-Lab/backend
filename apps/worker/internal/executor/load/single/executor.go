@@ -41,11 +41,8 @@ func New(testId string, cfg Config, live broker.Publisher) *Executor {
 }
 
 func (e *Executor) Run(ctx context.Context) (any, error) {
-	runCtx, cancel := context.WithTimeout(ctx, time.Duration(e.cfg.DurationSeconds)*time.Second)
-	defer cancel()
-
 	results := make(chan requestResult, 1024)
-	go e.pace(runCtx, results)
+	go e.pace(ctx, results)
 
 	return e.aggregate(ctx, results)
 }
@@ -61,9 +58,13 @@ func (e *Executor) pace(ctx context.Context, results chan<- requestResult) {
 
 	workers := 0
 	start := time.Now()
+	end := start.Add(e.duration())
 
 	for i := 0; ; i++ {
 		planned := start.Add(offset(i, e.cfg.TargetRPS, e.cfg.RampUpSeconds))
+		if !planned.Before(end) {
+			return
+		}
 
 		if wait := time.Until(planned); wait > 0 {
 			select {
@@ -152,6 +153,7 @@ func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) 
 	defer ticker.Stop()
 
 	start := time.Now()
+	elapsedSeconds := 0
 	second := newStats()
 	total := newStats()
 
@@ -159,8 +161,11 @@ func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) 
 		select {
 		case r, ok := <-results:
 			if !ok {
-				if err := e.publishSnapshot(context.Background(), e.snapshot(start, second)); err != nil {
-					return load.Result{}, err
+				if second.success+second.failed > 0 {
+					elapsedSeconds++
+					if err := e.publishSnapshot(context.WithoutCancel(ctx), e.snapshot(elapsedSeconds, second)); err != nil {
+						return load.Result{}, err
+					}
 				}
 				return e.result(start, total), nil
 			}
@@ -168,7 +173,8 @@ func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) 
 			second.add(r)
 			total.add(r)
 		case <-ticker.C:
-			if err := e.publishSnapshot(ctx, e.snapshot(start, second)); err != nil {
+			elapsedSeconds++
+			if err := e.publishSnapshot(ctx, e.snapshot(elapsedSeconds, second)); err != nil {
 				return load.Result{}, err
 			}
 			second.reset()
@@ -176,7 +182,7 @@ func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) 
 	}
 }
 
-func (e *Executor) snapshot(start time.Time, s *stats) load.Snapshot {
+func (e *Executor) snapshot(elapsedSeconds int, s *stats) load.Snapshot {
 	route := load.RouteSnapshot{
 		Method:       e.cfg.Target.Method,
 		URL:          e.cfg.Target.URL,
@@ -189,14 +195,15 @@ func (e *Executor) snapshot(start time.Time, s *stats) load.Snapshot {
 		route.ServiceTime = percentiles(s.serviceTimes)
 	}
 
-	elapsed := time.Since(start)
-	planned := plannedCount(elapsed, e.cfg.TargetRPS, e.cfg.RampUpSeconds) -
-		plannedCount(elapsed-time.Second, e.cfg.TargetRPS, e.cfg.RampUpSeconds)
+	secondEnd := min(time.Duration(elapsedSeconds)*time.Second, e.duration())
+	secondStart := min(time.Duration(elapsedSeconds-1)*time.Second, e.duration())
+	planned := plannedCount(secondEnd, e.cfg.TargetRPS, e.cfg.RampUpSeconds) -
+		plannedCount(secondStart, e.cfg.TargetRPS, e.cfg.RampUpSeconds)
 
 	return load.Snapshot{
 		TestId:         e.testId,
 		Timestamp:      time.Now().UTC().Truncate(time.Millisecond),
-		ElapsedSeconds: int(elapsed.Seconds()),
+		ElapsedSeconds: elapsedSeconds,
 		TargetRps:      int(math.Round(planned)),
 		ActualRps:      s.success + s.failed,
 		Routes:         []load.RouteSnapshot{route},
@@ -204,7 +211,7 @@ func (e *Executor) snapshot(start time.Time, s *stats) load.Snapshot {
 }
 
 func (e *Executor) result(start time.Time, s *stats) load.Result {
-	duration := time.Since(start)
+	duration := min(time.Since(start), e.duration())
 	total := s.success + s.failed
 
 	route := load.RouteResult{
@@ -237,6 +244,10 @@ func (e *Executor) publishSnapshot(ctx context.Context, snapshot load.Snapshot) 
 		return err
 	}
 	return e.live.Publish(ctx, "metrics:"+e.testId, body)
+}
+
+func (e *Executor) duration() time.Duration {
+	return time.Duration(e.cfg.DurationSeconds) * time.Second
 }
 
 func percentiles(w *metrics.LatencyWindow) *load.Percentiles {
