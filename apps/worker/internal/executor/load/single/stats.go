@@ -49,6 +49,8 @@ func (s *stats) add(r requestResult) {
 
 func (s *stats) reset() {
 	s.success, s.failed, s.late = 0, 0, 0
+	clear(s.statusCodes)
+	clear(s.errors)
 	s.responseTimes.Reset()
 	s.serviceTimes.Reset()
 }
