@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"maps"
 	"math"
 	"sync"
 	"worker/internal/broker"
@@ -188,6 +189,8 @@ func (e *Executor) snapshot(elapsedSeconds int, s *stats) load.Snapshot {
 		SuccessCount: s.success,
 		ErrorCount:   s.failed,
 		LateCount:    s.late,
+		StatusCodes:  maps.Clone(s.statusCodes),
+		Errors:       maps.Clone(s.errors),
 	}
 
 	if s.success > 0 {
@@ -221,6 +224,8 @@ func (e *Executor) result(start time.Time, s *stats) load.Result {
 		SuccessCount:  s.success,
 		ErrorCount:    s.failed,
 		LateCount:     s.late,
+		StatusCodes:   s.statusCodes,
+		Errors:        s.errors,
 	}
 
 	if total > 0 {
