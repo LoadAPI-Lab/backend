@@ -236,7 +236,7 @@ func (e *Executor) result(start time.Time, s *stats) load.Result {
 	}
 
 	return load.Result{
-		DurationMs: toMs(duration),
+		DurationMs: metrics.ToMs(duration),
 		TargetRps:  e.cfg.TargetRPS,
 		AvgRps:     float64(total) / duration.Seconds(),
 		Routes:     []load.RouteResult{route},
@@ -257,9 +257,5 @@ func (e *Executor) duration() time.Duration {
 
 func percentiles(w *metrics.LatencyWindow) *load.Percentiles {
 	p50, p95, p99 := w.Percentiles()
-	return &load.Percentiles{P50Ms: toMs(p50), P95Ms: toMs(p95), P99Ms: toMs(p99)}
-}
-
-func toMs(d time.Duration) float64 {
-	return float64(d) / float64(time.Millisecond)
+	return &load.Percentiles{P50Ms: metrics.ToMs(p50), P95Ms: metrics.ToMs(p95), P99Ms: metrics.ToMs(p99)}
 }
