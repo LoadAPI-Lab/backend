@@ -3,12 +3,17 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/signal"
 	"syscall"
 	"worker/internal/adapter/stdout"
+	"worker/internal/config"
 	"worker/internal/job"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -57,6 +62,16 @@ func main() {
 	var payload job.Payload
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		fmt.Fprintln(os.Stderr, "invalid payload:", err)
+		os.Exit(1)
+	}
+
+	if err := godotenv.Load(); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		fmt.Fprintln(os.Stderr, "cannot read .env:", err)
+		os.Exit(1)
+	}
+
+	if err := config.Load(); err != nil {
+		fmt.Fprintln(os.Stderr, "invalid configuration:", err)
 		os.Exit(1)
 	}
 

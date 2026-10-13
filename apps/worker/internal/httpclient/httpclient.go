@@ -4,9 +4,10 @@ import (
 	"net"
 	"net/http"
 	"time"
+	"worker/internal/config"
 )
 
-func New(reqTimeout time.Duration) *http.Client {
+func New() *http.Client {
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
@@ -20,6 +21,6 @@ func New(reqTimeout time.Duration) *http.Client {
 
 	return &http.Client{
 		Transport: transport,
-		Timeout:   reqTimeout,
+		Timeout:   config.Get().RequestTimeout,
 	}
 }

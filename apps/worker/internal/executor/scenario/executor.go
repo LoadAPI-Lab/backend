@@ -14,14 +14,13 @@ import (
 	"worker/internal/template"
 )
 
-const reqTimeout = 10 * time.Second
 const maxResponseBytes = 10 << 20
 
 func New(testId string, cfg Config) *Executor {
 	return &Executor{
 		testId: testId,
 		cfg:    cfg,
-		client: httpclient.New(reqTimeout),
+		client: httpclient.New(),
 	}
 }
 

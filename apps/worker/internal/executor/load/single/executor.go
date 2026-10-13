@@ -8,6 +8,7 @@ import (
 	"math"
 	"sync"
 	"worker/internal/broker"
+	"worker/internal/config"
 	"worker/internal/executor/load"
 	"worker/internal/httpclient"
 	"worker/internal/metrics"
@@ -18,11 +19,7 @@ import (
 	"time"
 )
 
-const (
-	reqTimeout    = 10 * time.Second
-	maxWorkers    = 10_000
-	lateThreshold = 10 * time.Millisecond
-)
+const lateThreshold = 10 * time.Millisecond
 
 type requestResult struct {
 	statusCode   int
@@ -36,7 +33,7 @@ func New(testId string, cfg Config, live broker.Publisher) *Executor {
 	return &Executor{
 		testId: testId,
 		cfg:    cfg,
-		client: httpclient.New(reqTimeout),
+		client: httpclient.New(),
 		live:   live,
 	}
 }
@@ -57,6 +54,7 @@ func (e *Executor) schedule(ctx context.Context, results chan<- requestResult) {
 		close(results)
 	}()
 
+	maxWorkers := config.Get().MaxWorkers
 	workers := 0
 	start := time.Now()
 	end := start.Add(e.duration())
