@@ -11,17 +11,17 @@ import (
 	"worker/internal/extractor"
 	"worker/internal/httpclient"
 	"worker/internal/job"
+	"worker/internal/metrics"
 	"worker/internal/template"
 )
 
-const reqTimeout = 10 * time.Second
 const maxResponseBytes = 10 << 20
 
 func New(testId string, cfg Config) *Executor {
 	return &Executor{
 		testId: testId,
 		cfg:    cfg,
-		client: httpclient.New(reqTimeout),
+		client: httpclient.New(),
 	}
 }
 
@@ -43,7 +43,7 @@ func (e *Executor) Run(ctx context.Context) (any, error) {
 
 		start := time.Now()
 		statusCode, respBody, err := e.doRequest(ctx, target)
-		durationMs := float64(time.Since(start)) / float64(time.Millisecond)
+		durationMs := metrics.ToMs(time.Since(start))
 
 		if ctx.Err() != nil {
 			return newResult(e.cfg.Steps, results, time.Since(runStart)), ctx.Err()
@@ -128,7 +128,7 @@ func newResult(steps []Step, results []StepResult, duration time.Duration) Resul
 	result := Result{
 		Summary: Summary{
 			TotalSteps: len(steps),
-			DurationMs: float64(duration) / float64(time.Millisecond),
+			DurationMs: metrics.ToMs(duration),
 		},
 		Steps: make([]StepResult, len(steps)),
 	}

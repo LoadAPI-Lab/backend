@@ -3,8 +3,12 @@ package single
 import (
 	"context"
 	"encoding/json"
+	"maps"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 	"worker/internal/executor/load"
@@ -110,5 +114,69 @@ func TestRunStopsOnCancel(t *testing.T) {
 
 	if elapsed := time.Since(start); elapsed > 2*time.Second {
 		t.Errorf("Run() took %v after cancel, want it to stop right away", elapsed)
+	}
+}
+
+func TestRunCountsStatusCodes(t *testing.T) {
+	var requests atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if requests.Add(1)%2 == 0 {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	cfg := Config{
+		Target:          job.Target{Method: http.MethodGet, URL: server.URL},
+		TargetRPS:       10,
+		DurationSeconds: 2,
+	}
+
+	route, _ := runSingle(t, context.Background(), cfg)
+
+	want := map[int]int{200: 10, 500: 10}
+	if !maps.Equal(route.StatusCodes, want) {
+		t.Errorf("StatusCodes = %v, want %v", route.StatusCodes, want)
+	}
+	if route.SuccessCount != 10 || route.ErrorCount != 10 {
+		t.Errorf("SuccessCount = %d, ErrorCount = %d, want 10 and 10", route.SuccessCount, route.ErrorCount)
+	}
+	if len(route.Errors) != 0 {
+		t.Errorf("Errors = %v, want none", route.Errors)
+	}
+}
+
+func TestRunCountsNetworkErrors(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("connection refused has a different OS error code on Windows")
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	closedURL := "http://" + listener.Addr().String()
+	listener.Close()
+
+	cfg := Config{
+		Target:          job.Target{Method: http.MethodGet, URL: closedURL},
+		TargetRPS:       10,
+		DurationSeconds: 1,
+	}
+
+	route, _ := runSingle(t, context.Background(), cfg)
+
+	want := map[load.NetworkError]int{load.ErrorConnectionRefused: 10}
+	if !maps.Equal(route.Errors, want) {
+		t.Errorf("Errors = %v, want %v", route.Errors, want)
+	}
+	if route.ErrorCount != 10 {
+		t.Errorf("ErrorCount = %d, want 10", route.ErrorCount)
+	}
+	if len(route.StatusCodes) != 0 {
+		t.Errorf("StatusCodes = %v, want none", route.StatusCodes)
+	}
+	if route.ResponseTime != nil {
+		t.Errorf("ResponseTime = %+v, want nil: no successful responses", route.ResponseTime)
 	}
 }
