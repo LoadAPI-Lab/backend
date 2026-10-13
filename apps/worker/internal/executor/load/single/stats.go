@@ -22,7 +22,7 @@ func (s *stats) add(r requestResult) {
 		s.late++
 	}
 
-	if r.err != nil {
+	if r.err != nil || r.statusCode >= 400 {
 		s.failed++
 		return
 	}

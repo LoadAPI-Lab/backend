@@ -3,7 +3,6 @@ package single
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"math"
 	"sync"
@@ -25,6 +24,7 @@ const (
 )
 
 type requestResult struct {
+	statusCode   int
 	responseTime time.Duration
 	serviceTime  time.Duration
 	late         bool
@@ -42,12 +42,12 @@ func New(testId string, cfg Config, live broker.Publisher) *Executor {
 
 func (e *Executor) Run(ctx context.Context) (any, error) {
 	results := make(chan requestResult, 1024)
-	go e.pace(ctx, results)
+	go e.schedule(ctx, results)
 
 	return e.aggregate(ctx, results)
 }
 
-func (e *Executor) pace(ctx context.Context, results chan<- requestResult) {
+func (e *Executor) schedule(ctx context.Context, results chan<- requestResult) {
 	ticks := make(chan time.Time)
 	var wg sync.WaitGroup
 	defer func() {
@@ -61,21 +61,21 @@ func (e *Executor) pace(ctx context.Context, results chan<- requestResult) {
 	end := start.Add(e.duration())
 
 	for i := 0; ; i++ {
-		planned := start.Add(offset(i, e.cfg.TargetRPS, e.cfg.RampUpSeconds))
-		if !planned.Before(end) {
+		reqAt := start.Add(offset(i, e.cfg.TargetRPS, e.cfg.RampUpSeconds))
+		if !reqAt.Before(end) {
 			return
 		}
 
-		if wait := time.Until(planned); wait > 0 {
+		if timeToReq := time.Until(reqAt); timeToReq > 0 {
 			select {
-			case <-time.After(wait):
+			case <-time.After(timeToReq):
 			case <-ctx.Done():
 				return
 			}
 		}
 
 		select {
-		case ticks <- planned:
+		case ticks <- reqAt:
 			continue
 		default:
 		}
@@ -90,7 +90,7 @@ func (e *Executor) pace(ctx context.Context, results chan<- requestResult) {
 		}
 
 		select {
-		case ticks <- planned:
+		case ticks <- reqAt:
 		case <-ctx.Done():
 			return
 		}
@@ -100,13 +100,14 @@ func (e *Executor) pace(ctx context.Context, results chan<- requestResult) {
 func (e *Executor) worker(ctx context.Context, ticks <-chan time.Time, results chan<- requestResult) {
 	for planned := range ticks {
 		sent := time.Now()
-		err := e.doRequest(ctx)
+		statusCode, err := e.doRequest(ctx)
 		if ctx.Err() != nil {
 			return
 		}
 		done := time.Now()
 
 		results <- requestResult{
+			statusCode:   statusCode,
 			responseTime: done.Sub(planned),
 			serviceTime:  done.Sub(sent),
 			late:         sent.Sub(planned) > lateThreshold,
@@ -115,7 +116,7 @@ func (e *Executor) worker(ctx context.Context, ticks <-chan time.Time, results c
 	}
 }
 
-func (e *Executor) doRequest(ctx context.Context) error {
+func (e *Executor) doRequest(ctx context.Context) (int, error) {
 	body := template.Resolve(e.cfg.Target.Body)
 
 	req, err := http.NewRequestWithContext(
@@ -126,7 +127,7 @@ func (e *Executor) doRequest(ctx context.Context) error {
 	)
 
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	for k, v := range e.cfg.Target.Headers {
@@ -135,17 +136,15 @@ func (e *Executor) doRequest(ctx context.Context) error {
 
 	resp, err := e.client.Do(req)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
 
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("http %d", resp.StatusCode)
-
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+		return 0, err
 	}
 
-	return nil
+	return resp.StatusCode, nil
 }
 
 func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) (load.Result, error) {
@@ -190,6 +189,7 @@ func (e *Executor) snapshot(elapsedSeconds int, s *stats) load.Snapshot {
 		ErrorCount:   s.failed,
 		LateCount:    s.late,
 	}
+
 	if s.success > 0 {
 		route.ResponseTime = percentiles(s.responseTimes)
 		route.ServiceTime = percentiles(s.serviceTimes)
@@ -222,9 +222,11 @@ func (e *Executor) result(start time.Time, s *stats) load.Result {
 		ErrorCount:    s.failed,
 		LateCount:     s.late,
 	}
+
 	if total > 0 {
 		route.ErrorRate = float64(s.failed) / float64(total)
 	}
+
 	if s.success > 0 {
 		route.ResponseTime = percentiles(s.responseTimes)
 		route.ServiceTime = percentiles(s.serviceTimes)
