@@ -16,6 +16,10 @@ func New(p job.Payload, live broker.Publisher) (Executor, error) {
 		if err := json.Unmarshal(p.Config, &cfg); err != nil {
 			return nil, fmt.Errorf("decode single test config: %w", err)
 		}
+		if err := cfg.Validate(); err != nil {
+			return nil, fmt.Errorf("invalid single test config: %w", err)
+		}
+
 		return single.New(p.TestId, cfg, live), nil
 
 	case job.TestTypeScenario:
@@ -23,6 +27,10 @@ func New(p job.Payload, live broker.Publisher) (Executor, error) {
 		if err := json.Unmarshal(p.Config, &cfg); err != nil {
 			return nil, fmt.Errorf("decode scenario test config: %w", err)
 		}
+		if err := cfg.Validate(); err != nil {
+			return nil, fmt.Errorf("invalid scenario test config: %w", err)
+		}
+
 		return scenario.New(p.TestId, cfg), nil
 
 	default:
