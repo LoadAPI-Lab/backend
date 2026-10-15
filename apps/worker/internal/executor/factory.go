@@ -9,7 +9,7 @@ import (
 	"worker/internal/job"
 )
 
-func New(p job.Payload, live broker.Publisher) (Executor, error) {
+func New(p job.Payload, snapshotPublisher broker.Publisher) (Executor, error) {
 	switch p.Type {
 	case job.TestTypeSingle:
 		var cfg single.Config
@@ -20,7 +20,7 @@ func New(p job.Payload, live broker.Publisher) (Executor, error) {
 			return nil, fmt.Errorf("invalid single test config: %w", err)
 		}
 
-		return single.New(p.TestId, cfg, live), nil
+		return single.New(p.TestId, cfg, snapshotPublisher), nil
 
 	case job.TestTypeScenario:
 		var cfg scenario.Config

@@ -7,10 +7,10 @@ import (
 )
 
 type Executor struct {
-	testId string
-	cfg    Config
-	client *http.Client
-	live   broker.Publisher
+	testId            string
+	cfg               Config
+	client            *http.Client
+	snapshotPublisher broker.Publisher
 }
 
 type Config struct {

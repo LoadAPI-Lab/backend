@@ -10,11 +10,15 @@ import (
 type Env struct {
 	MaxWorkers     int
 	RequestTimeout time.Duration
+	RedisURL       string
+	RabbitMQURL    string
 }
 
 var current = Env{
 	MaxWorkers:     10_000,
 	RequestTimeout: 10 * time.Second,
+	RedisURL:       "redis://localhost:6379/0",
+	RabbitMQURL:    "amqp://loadapi:loadapi@localhost:5672/",
 }
 
 func Get() Env {
@@ -35,6 +39,8 @@ func Load() error {
 	current = Env{
 		MaxWorkers:     maxWorkers,
 		RequestTimeout: requestTimeout,
+		RedisURL:       stringFromEnv("REDIS_URL", current.RedisURL),
+		RabbitMQURL:    stringFromEnv("RABBITMQ_URL", current.RabbitMQURL),
 	}
 	return nil
 }
@@ -63,4 +69,11 @@ func durationFromEnv(name string, fallback time.Duration) (time.Duration, error)
 		return 0, fmt.Errorf("%s must be a positive duration like 10s or 500ms, got %q", name, raw)
 	}
 	return value, nil
+}
+
+func stringFromEnv(name, fallback string) string {
+	if raw := os.Getenv(name); raw != "" {
+		return raw
+	}
+	return fallback
 }
