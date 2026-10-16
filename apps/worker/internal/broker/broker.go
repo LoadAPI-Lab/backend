@@ -9,3 +9,7 @@ type Publisher interface {
 type Consumer interface {
 	Receive(ctx context.Context) ([]byte, error)
 }
+
+type StopWatcher interface {
+	Watch(ctx context.Context, testId string) (context.Context, context.CancelFunc, error)
+}

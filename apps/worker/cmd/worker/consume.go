@@ -9,7 +9,7 @@ import (
 	"worker/internal/job"
 )
 
-func consume(ctx context.Context, jobConsumer broker.Consumer, snapshotPublisher, eventPublisher broker.Publisher) error {
+func consume(ctx context.Context, jobConsumer broker.Consumer, stopWatcher broker.StopWatcher, snapshotPublisher, eventPublisher broker.Publisher) error {
 	log.Print("waiting for jobs")
 
 	for {
@@ -27,8 +27,16 @@ func consume(ctx context.Context, jobConsumer broker.Consumer, snapshotPublisher
 			continue
 		}
 
+		testCtx, stopWatching, err := stopWatcher.Watch(ctx, payload.TestId)
+		if err != nil {
+			log.Printf("test %s: stop command unavailable: %v", payload.TestId, err)
+			testCtx, stopWatching = ctx, func() {}
+		}
+
 		log.Printf("test %s: started (%s)", payload.TestId, payload.Type)
-		if err := runTest(ctx, payload, snapshotPublisher, eventPublisher); err != nil {
+		err = runTest(testCtx, payload, snapshotPublisher, eventPublisher)
+		stopWatching()
+		if err != nil {
 			return err
 		}
 		log.Printf("test %s: finished", payload.TestId)

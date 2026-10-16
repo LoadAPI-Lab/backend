@@ -34,11 +34,11 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	snapshotPublisher, err := redis.New(config.Get().RedisURL)
+	redisClient, err := redis.New(config.Get().RedisURL)
 	if err != nil {
 		return fmt.Errorf("start snapshot publisher: %w", err)
 	}
-	defer snapshotPublisher.Close()
+	defer redisClient.Close()
 
 	eventPublisher, err := rabbitmq.NewPublisher(config.Get().RabbitMQURL, resultsQueue)
 	if err != nil {
@@ -52,5 +52,5 @@ func run() error {
 	}
 	defer jobConsumer.Close()
 
-	return consume(ctx, jobConsumer, snapshotPublisher, eventPublisher)
+	return consume(ctx, jobConsumer, redisClient, redisClient, eventPublisher)
 }
