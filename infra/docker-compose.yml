@@ -63,6 +63,13 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  testserver:
+    build:
+      context: ../apps/testserver
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${TESTSERVER_PORT:-8080}:8080"
+
 volumes:
   redis-data:
   rabbitmq-data:

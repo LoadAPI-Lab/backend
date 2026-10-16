@@ -43,6 +43,8 @@ func New(testId string, cfg Config, snapshotPublisher broker.Publisher) *Executo
 }
 
 func (e *Executor) Run(ctx context.Context) (any, error) {
+	defer e.client.CloseIdleConnections()
+
 	results := make(chan requestResult, 1024)
 	go e.schedule(ctx, results)
 
