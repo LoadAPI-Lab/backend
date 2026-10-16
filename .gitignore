@@ -8,6 +8,8 @@ coverage/
 apps/worker/bin/
 apps/worker/worker
 
+bench/results/
+
 # env
 .env
 .env.*

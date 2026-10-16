@@ -52,6 +52,13 @@ worker/transport:
           - 'apps/worker/cmd/**'
           - 'apps/worker/internal/publisher/**'
 
+# ---------- test server ----------
+testserver:
+  - changed-files:
+      - all-globs-to-any-file:
+          - 'apps/testserver/**'
+          - '!apps/testserver/**/*_test.go'
+
 # ---------- shared ----------
 test:
   - changed-files:
@@ -75,6 +82,10 @@ devops:
           - 'infra/**'
           - '**/Dockerfile*'
           - '**/.dockerignore'
+
+bench:
+  - changed-files:
+      - any-glob-to-any-file: ['bench/**', 'LICENSE']
 
 docs:
   - changed-files:

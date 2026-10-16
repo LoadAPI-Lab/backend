@@ -2,88 +2,55 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"os/signal"
 	"syscall"
-	"worker/internal/adapter/stdout"
+	"worker/internal/adapter/rabbitmq"
+	"worker/internal/adapter/redis"
 	"worker/internal/config"
-	"worker/internal/job"
 
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	raw := []byte(`{
-	"testId": "demo-scenario-1",
-	"type": "scenario",
-	"config": {
-		"steps": [
-			{
-				"target": {
-					"method": "POST",
-					"url": "https://api.example.com/auth/login",
-					"headers": {"Content-Type": "application/json"},
-					"body": "{\"email\":\"demo@example.com\",\"password\":\"secret\"}"
-				},
-				"extract": [{"name": "accessToken", "path": "accessToken"}]
-			},
-			{
-				"target": {
-					"method": "POST",
-					"url": "https://api.example.com/tasks",
-					"headers": {"Content-Type": "application/json", "Authorization": "Bearer {{accessToken}}"},
-					"body": "{\"title\":\"task-{{$uuid}}\",\"priority\":{{$randomInt}}}"
-				},
-				"extract": [{"name": "taskId", "path": "data.id"}]
-			},
-			{
-				"target": {
-					"method": "GET",
-					"url": "https://api.example.com/tasks/{{taskId}}",
-					"headers": {"Authorization": "Bearer {{accessToken}}"}
-				}
-			},
-			{
-				"target": {
-					"method": "PATCH",
-					"url": "https://api.example.com/tasks/{{taskId}}",
-					"headers": {"Content-Type": "application/json", "Authorization": "Bearer {{accessToken}}"},
-					"body": "{\"status\":\"done\"}"
-					}
-				}
-			]
-		}
-	}`)
-
-	var payload job.Payload
-	if err := json.Unmarshal(raw, &payload); err != nil {
-		fmt.Fprintln(os.Stderr, "invalid payload:", err)
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
 
+func run() error {
 	if err := godotenv.Load(); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		fmt.Fprintln(os.Stderr, "cannot read .env:", err)
-		os.Exit(1)
+		return fmt.Errorf("read .env: %w", err)
 	}
 
 	if err := config.Load(); err != nil {
-		fmt.Fprintln(os.Stderr, "invalid configuration:", err)
-		os.Exit(1)
+		return fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	live := stdout.Publisher{}
-	results := stdout.Publisher{}
-
-	if err := runTest(ctx, payload, live, results); err != nil {
-		fmt.Fprintln(os.Stderr, "test run failed:", err)
-		os.Exit(1)
+	redisClient, err := redis.New(config.Get().RedisURL)
+	if err != nil {
+		return fmt.Errorf("start snapshot publisher: %w", err)
 	}
+	defer redisClient.Close()
 
+	eventPublisher, err := rabbitmq.NewPublisher(config.Get().RabbitMQURL, resultsQueue)
+	if err != nil {
+		return fmt.Errorf("start event publisher: %w", err)
+	}
+	defer eventPublisher.Close()
+
+	jobConsumer, err := rabbitmq.NewConsumer(config.Get().RabbitMQURL, jobsQueue)
+	if err != nil {
+		return fmt.Errorf("start jobs consumer: %w", err)
+	}
+	defer jobConsumer.Close()
+
+	return consume(ctx, jobConsumer, redisClient, redisClient, eventPublisher)
 }

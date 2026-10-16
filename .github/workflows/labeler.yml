@@ -30,9 +30,11 @@ jobs:
           "worker/metrics:c5bff5:Percentiles and snapshots"
           "worker/templating:c5bff5:Placeholders and extraction"
           "worker/transport:c5bff5:Entry point, RabbitMQ, Redis"
+          "testserver:f9a825:Test server"
           "test:ff69b4:Unit and E2E tests"
           "deps:0366d6:Dependencies"
           "devops:006b75:Infrastructure and CI/CD"
+          "bench:00a896:Benchmarks"
           "docs:0075ca:Documentation"
           )
           for label in "${labels[@]}"; do

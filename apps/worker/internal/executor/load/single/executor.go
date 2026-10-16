@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log"
 	"maps"
 	"math"
 	"sync"
@@ -19,7 +20,10 @@ import (
 	"time"
 )
 
-const lateThreshold = 10 * time.Millisecond
+const (
+	lateThreshold  = 10 * time.Millisecond
+	publishTimeout = 200 * time.Millisecond
+)
 
 type requestResult struct {
 	statusCode   int
@@ -29,20 +33,22 @@ type requestResult struct {
 	err          error
 }
 
-func New(testId string, cfg Config, live broker.Publisher) *Executor {
+func New(testId string, cfg Config, snapshotPublisher broker.Publisher) *Executor {
 	return &Executor{
-		testId: testId,
-		cfg:    cfg,
-		client: httpclient.New(),
-		live:   live,
+		testId:            testId,
+		cfg:               cfg,
+		client:            httpclient.New(),
+		snapshotPublisher: snapshotPublisher,
 	}
 }
 
 func (e *Executor) Run(ctx context.Context) (any, error) {
+	defer e.client.CloseIdleConnections()
+
 	results := make(chan requestResult, 1024)
 	go e.schedule(ctx, results)
 
-	return e.aggregate(ctx, results)
+	return e.aggregate(ctx, results), nil
 }
 
 func (e *Executor) schedule(ctx context.Context, results chan<- requestResult) {
@@ -146,7 +152,7 @@ func (e *Executor) doRequest(ctx context.Context) (int, error) {
 	return resp.StatusCode, nil
 }
 
-func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) (load.Result, error) {
+func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) load.Result {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
@@ -161,20 +167,16 @@ func (e *Executor) aggregate(ctx context.Context, results <-chan requestResult) 
 			if !ok {
 				if second.success+second.failed > 0 {
 					elapsedSeconds++
-					if err := e.publishSnapshot(context.WithoutCancel(ctx), e.snapshot(elapsedSeconds, second)); err != nil {
-						return load.Result{}, err
-					}
+					e.publishSnapshot(context.WithoutCancel(ctx), e.snapshot(elapsedSeconds, second))
 				}
-				return e.result(start, total), nil
+				return e.result(start, total)
 			}
 
 			second.add(r)
 			total.add(r)
 		case <-ticker.C:
 			elapsedSeconds++
-			if err := e.publishSnapshot(ctx, e.snapshot(elapsedSeconds, second)); err != nil {
-				return load.Result{}, err
-			}
+			e.publishSnapshot(ctx, e.snapshot(elapsedSeconds, second))
 			second.reset()
 		}
 	}
@@ -243,12 +245,19 @@ func (e *Executor) result(start time.Time, s *stats) load.Result {
 	}
 }
 
-func (e *Executor) publishSnapshot(ctx context.Context, snapshot load.Snapshot) error {
+func (e *Executor) publishSnapshot(ctx context.Context, snapshot load.Snapshot) {
 	body, err := json.Marshal(snapshot)
 	if err != nil {
-		return err
+		log.Printf("test %s: encode snapshot %d: %v", e.testId, snapshot.ElapsedSeconds, err)
+		return
 	}
-	return e.live.Publish(ctx, "metrics:"+e.testId, body)
+
+	ctx, cancel := context.WithTimeout(ctx, publishTimeout)
+	defer cancel()
+
+	if err := e.snapshotPublisher.Publish(ctx, "snapshot:"+e.testId, body); err != nil {
+		log.Printf("test %s: snapshot %d lost: %v", e.testId, snapshot.ElapsedSeconds, err)
+	}
 }
 
 func (e *Executor) duration() time.Duration {
