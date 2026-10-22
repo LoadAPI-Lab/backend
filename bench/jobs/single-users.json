@@ -1,0 +1,14 @@
+{
+  "testId": "replaced-by-publish-script",
+  "type": "single",
+  "config": {
+    "target": {
+      "method": "POST",
+      "url": "http://testserver:8080/users",
+      "headers": { "Content-Type": "application/json" },
+      "body": "{\"email\":\"{{$randomEmail}}\",\"name\":\"load\"}"
+    },
+    "targetRps": 100,
+    "durationSeconds": 10
+  }
+}

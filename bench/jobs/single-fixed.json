@@ -1,0 +1,10 @@
+{
+  "testId": "replaced-by-publish-script",
+  "type": "single",
+  "config": {
+    "target": { "method": "GET", "url": "http://testserver:8080/fixed?delay=10ms&size=1024" },
+    "targetRps": 200,
+    "durationSeconds": 20,
+    "rampUpSeconds": 5
+  }
+}

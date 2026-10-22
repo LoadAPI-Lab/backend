@@ -1,0 +1,48 @@
+{
+  "testId": "replaced-by-publish-script",
+  "type": "scenario",
+  "config": {
+    "steps": [
+      {
+        "target": {
+          "method": "POST",
+          "url": "http://testserver:8080/auth/login",
+          "headers": { "Content-Type": "application/json" },
+          "body": "{\"email\":\"demo@example.com\",\"password\":\"secret\"}"
+        },
+        "extract": [{ "name": "accessToken", "path": "accessToken" }]
+      },
+      {
+        "target": {
+          "method": "POST",
+          "url": "http://testserver:8080/tasks",
+          "headers": { "Content-Type": "application/json", "Authorization": "Bearer {{accessToken}}" },
+          "body": "{\"title\":\"task-{{$uuid}}\"}"
+        },
+        "extract": [{ "name": "taskId", "path": "data.id" }]
+      },
+      {
+        "target": {
+          "method": "GET",
+          "url": "http://testserver:8080/tasks/{{taskId}}",
+          "headers": { "Authorization": "Bearer {{accessToken}}" }
+        }
+      },
+      {
+        "target": {
+          "method": "PATCH",
+          "url": "http://testserver:8080/tasks/{{taskId}}",
+          "headers": { "Content-Type": "application/json", "Authorization": "Bearer {{accessToken}}" },
+          "body": "{\"status\":\"done\"}"
+        }
+      },
+      {
+        "target": {
+          "method": "DELETE",
+          "url": "http://testserver:8080/tasks/{{taskId}}",
+          "headers": { "Authorization": "Bearer {{accessToken}}" }
+        }
+      }
+    ]
+  }
+}

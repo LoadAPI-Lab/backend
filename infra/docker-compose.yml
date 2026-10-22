@@ -66,6 +66,9 @@ services:
   testserver:
     build:
       context: ../apps/testserver
+    environment:
+      STALL_EVERY: ${STALL_EVERY:-}
+      STALL_FOR: ${STALL_FOR:-}
     restart: unless-stopped
     ports:
       - "127.0.0.1:${TESTSERVER_PORT:-8080}:8080"

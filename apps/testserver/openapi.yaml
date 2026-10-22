@@ -1,0 +1,295 @@
+openapi: 3.0.3
+info:
+  title: LoadAPI test server
+  version: 1.0.0
+  description: |
+    Predictable target for load tests and scenario demos. No database:
+    data lives in memory (at most 100 000 entries per store, oldest evicted)
+    and is lost on restart.
+
+    Stall mode (env STALL_EVERY / STALL_FOR) freezes the server at the end of
+    every period: requests arriving in the window wait until it ends.
+servers:
+  - url: http://testserver:8080
+    description: From containers in the Docker network (LoadAPI worker)
+  - url: http://localhost:8080
+    description: From the host machine
+tags:
+  - name: load
+    description: Benchmark targets
+  - name: scenario
+    description: Demo API for scenarios (login → tasks)
+  - name: templating
+    description: Demo of body placeholders
+  - name: admin
+    description: Server statistics, not counted in them
+
+paths:
+  /fixed:
+    get:
+      tags: [load]
+      summary: Respond after a fixed delay with a body of a given size
+      parameters:
+        - name: delay
+          in: query
+          description: Go duration from 0 to 60s
+          schema: { type: string, example: 10ms }
+        - name: size
+          in: query
+          description: Body size in bytes, 0 to 1048576
+          schema: { type: integer, minimum: 0, maximum: 1048576, example: 1024 }
+      responses:
+        "200":
+          description: Body of `size` bytes
+          content:
+            text/plain:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/BadParameter" }
+
+  /status/{code}:
+    get:
+      tags: [load]
+      summary: Respond with the given status code and an empty body
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: integer, minimum: 200, maximum: 599, example: 429 }
+      responses:
+        default:
+          description: The requested status code
+        "400": { $ref: "#/components/responses/BadParameter" }
+
+  /flaky:
+    get:
+      tags: [load]
+      summary: Respond 500 with probability errorRate, otherwise 200
+      parameters:
+        - name: errorRate
+          in: query
+          schema: { type: number, minimum: 0, maximum: 1, example: 0.05 }
+        - name: delay
+          in: query
+          schema: { type: string, example: 10ms }
+      responses:
+        "200": { description: Success }
+        "500": { description: Simulated failure }
+        "400": { $ref: "#/components/responses/BadParameter" }
+
+  /auth/login:
+    post:
+      tags: [scenario]
+      summary: Get an access token (any non-empty email and password)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+            example: { email: demo@example.com, password: secret }
+      responses:
+        "200":
+          description: Token for the Authorization header
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /tasks:
+    post:
+      tags: [scenario]
+      summary: Create a task
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTaskRequest" }
+            example: { title: "task-{{$uuid}}" }
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /tasks/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, example: 1 }
+    get:
+      tags: [scenario]
+      summary: Get a task of the current user
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [scenario]
+      summary: Update the title and/or status of a task
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateTaskRequest" }
+            example: { status: done }
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [scenario]
+      summary: Delete a task
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users:
+    post:
+      tags: [templating]
+      summary: Register a user; a repeated email gives 409
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateUserRequest" }
+            example: { email: "{{$randomEmail}}", name: Demo }
+      responses:
+        "201":
+          description: Created user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /admin/stats:
+    get:
+      tags: [admin]
+      summary: Requests that arrived at the server, per second since start or reset
+      responses:
+        "200":
+          description: Arrival counts; perSecond[0] is the first second
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Stats" }
+
+  /admin/reset:
+    post:
+      tags: [admin]
+      summary: Reset counters and restart the stall schedule from now
+      responses:
+        "204": { description: Reset }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+    LoginResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        tokenType: { type: string, example: Bearer }
+    Task:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        status: { type: string, enum: [todo, in_progress, done] }
+        createdAt: { type: string, format: date-time }
+    TaskResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Task" }
+    CreateTaskRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        status: { type: string, enum: [todo, in_progress, done], default: todo }
+    UpdateTaskRequest:
+      type: object
+      properties:
+        title: { type: string }
+        status: { type: string, enum: [todo, in_progress, done] }
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        name: { type: string }
+    UserResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/User" }
+    CreateUserRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string }
+        name: { type: string }
+    Stats:
+      type: object
+      properties:
+        since: { type: string, format: date-time }
+        totalRequests: { type: integer }
+        perSecond:
+          type: array
+          items: { type: integer }
+
+  responses:
+    BadParameter:
+      description: Invalid query or path parameter
+      content:
+        text/plain:
+          schema: { type: string }
+    BadRequest:
+      description: Invalid body
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: No such task for this user
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Email already registered
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
