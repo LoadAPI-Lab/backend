@@ -1,0 +1,1332 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+auth.go
+config.go
+Dockerfile
+fixed.go
+go.mod
+main.go
+openapi.go
+openapi.yaml
+respond.go
+server_test.go
+store.go
+tasks.go
+traffic.go
+users.go
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="auth.go">
+package main
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"net/http"
+	"strings"
+)
+
+const maxSessions = 100_000
+
+type sessions struct {
+	tokens *boundedMap[string, string]
+}
+
+type loginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type loginResponse struct {
+	AccessToken string `json:"accessToken"`
+	TokenType   string `json:"tokenType"`
+}
+
+type ownerKey struct{}
+
+func newSessions() *sessions {
+	return &sessions{tokens: newBoundedMap[string, string](maxSessions)}
+}
+
+func (s *sessions) handleLogin(w http.ResponseWriter, r *http.Request) {
+	var req loginRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if req.Email == "" || req.Password == "" {
+		writeError(w, http.StatusUnauthorized, "email and password are required")
+		return
+	}
+
+	token := newToken()
+	s.tokens.Add(token, req.Email)
+	writeJSON(w, http.StatusOK, loginResponse{AccessToken: token, TokenType: "Bearer"})
+}
+
+func (s *sessions) requireAuth(next http.HandlerFunc) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "missing bearer token")
+			return
+		}
+		owner, ok := s.tokens.Get(token)
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "invalid or expired token")
+			return
+		}
+		next(w, r.WithContext(context.WithValue(r.Context(), ownerKey{}, owner)))
+	})
+}
+
+func ownerFrom(r *http.Request) string {
+	owner, _ := r.Context().Value(ownerKey{}).(string)
+	return owner
+}
+
+func newToken() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+</file>
+
+<file path="config.go">
+package main
+
+import (
+	"fmt"
+	"os"
+	"time"
+)
+
+type config struct {
+	stallEvery time.Duration
+	stallFor   time.Duration
+}
+
+func loadConfig() (config, error) {
+	every, err := durationFromEnv("STALL_EVERY")
+	if err != nil {
+		return config{}, err
+	}
+	stallFor, err := durationFromEnv("STALL_FOR")
+	if err != nil {
+		return config{}, err
+	}
+
+	if (every == 0) != (stallFor == 0) {
+		return config{}, fmt.Errorf("STALL_EVERY and STALL_FOR must be set together")
+	}
+	if every > 0 && stallFor >= every {
+		return config{}, fmt.Errorf("STALL_FOR (%s) must be shorter than STALL_EVERY (%s)", stallFor, every)
+	}
+
+	return config{stallEvery: every, stallFor: stallFor}, nil
+}
+
+func durationFromEnv(name string) (time.Duration, error) {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return 0, nil
+	}
+	value, err := time.ParseDuration(raw)
+	if err != nil || value <= 0 {
+		return 0, fmt.Errorf("%s must be a positive duration like 30s, got %q", name, raw)
+	}
+	return value, nil
+}
+</file>
+
+<file path="Dockerfile">
+FROM golang:1.26-alpine AS build
+WORKDIR /src
+
+COPY go.mod ./
+COPY . .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/testserver .
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/testserver /testserver
+EXPOSE 8080
+ENTRYPOINT ["/testserver"]
+</file>
+
+<file path="fixed.go">
+package main
+
+import (
+	"context"
+	"fmt"
+	"math/rand/v2"
+	"net/http"
+	"strconv"
+	"time"
+)
+
+const (
+	maxDelay = 60 * time.Second
+	maxSize  = 1 << 20
+)
+
+var filler = func() []byte {
+	b := make([]byte, maxSize)
+	for i := range b {
+		b[i] = 'x'
+	}
+	return b
+}()
+
+func handleFixed(w http.ResponseWriter, r *http.Request) {
+	delay, err := parseDelay(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	size := 0
+	if raw := r.URL.Query().Get("size"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 || n > maxSize {
+			http.Error(w, fmt.Sprintf("size must be a number of bytes from 0 to %d, got %q", maxSize, raw), http.StatusBadRequest)
+			return
+		}
+		size = n
+	}
+
+	if !wait(r.Context(), delay) {
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Length", strconv.Itoa(size))
+	w.Write(filler[:size])
+}
+
+func handleStatus(w http.ResponseWriter, r *http.Request) {
+	raw := r.PathValue("code")
+	code, err := strconv.Atoi(raw)
+	if err != nil || code < 200 || code > 599 {
+		http.Error(w, fmt.Sprintf("status code must be a number from 200 to 599, got %q", raw), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(code)
+}
+
+func handleFlaky(w http.ResponseWriter, r *http.Request) {
+	delay, err := parseDelay(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	rate := 0.0
+	if raw := r.URL.Query().Get("errorRate"); raw != "" {
+		value, err := strconv.ParseFloat(raw, 64)
+		if err != nil || value < 0 || value > 1 {
+			http.Error(w, fmt.Sprintf("errorRate must be a number from 0 to 1, got %q", raw), http.StatusBadRequest)
+			return
+		}
+		rate = value
+	}
+
+	if !wait(r.Context(), delay) {
+		return
+	}
+
+	if rand.Float64() < rate {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func parseDelay(r *http.Request) (time.Duration, error) {
+	raw := r.URL.Query().Get("delay")
+	if raw == "" {
+		return 0, nil
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d < 0 || d > maxDelay {
+		return 0, fmt.Errorf("delay must be a duration from 0 to %s, got %q", maxDelay, raw)
+	}
+	return d, nil
+}
+
+func wait(ctx context.Context, d time.Duration) bool {
+	if d <= 0 {
+		return true
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+</file>
+
+<file path="go.mod">
+module testserver
+
+go 1.26.4
+</file>
+
+<file path="main.go">
+package main
+
+import (
+	"log"
+	"net/http"
+	"time"
+)
+
+const addr = ":8080"
+
+func main() {
+	cfg, err := loadConfig()
+	if err != nil {
+		log.Fatalf("invalid configuration: %v", err)
+	}
+
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           newHandler(newTraffic(cfg.stallEvery, cfg.stallFor)),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	if cfg.stallEvery > 0 {
+		log.Printf("stall mode: at the end of every %s the server freezes for %s", cfg.stallEvery, cfg.stallFor)
+	}
+	log.Printf("test server listening on %s", addr)
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func newHandler(traffic *traffic) http.Handler {
+	sessions := newSessions()
+	tasks := newTaskStore()
+	users := newUserStore()
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /fixed", handleFixed)
+	mux.HandleFunc("GET /status/{code}", handleStatus)
+	mux.HandleFunc("GET /flaky", handleFlaky)
+
+	mux.HandleFunc("POST /auth/login", sessions.handleLogin)
+	mux.Handle("POST /tasks", sessions.requireAuth(tasks.handleCreate))
+	mux.Handle("GET /tasks/{id}", sessions.requireAuth(tasks.handleGet))
+	mux.Handle("PATCH /tasks/{id}", sessions.requireAuth(tasks.handleUpdate))
+	mux.Handle("DELETE /tasks/{id}", sessions.requireAuth(tasks.handleDelete))
+
+	mux.HandleFunc("POST /users", users.handleCreate)
+
+	mux.HandleFunc("GET /admin/stats", traffic.handleStats)
+	mux.HandleFunc("POST /admin/reset", traffic.handleReset)
+	mux.HandleFunc("GET /openapi.yaml", handleOpenAPI)
+
+	return traffic.middleware(mux)
+}
+</file>
+
+<file path="openapi.go">
+package main
+
+import (
+	_ "embed"
+	"net/http"
+)
+
+var openAPISpec []byte
+
+func handleOpenAPI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/yaml")
+	w.Write(openAPISpec)
+}
+</file>
+
+<file path="openapi.yaml">
+openapi: 3.0.3
+info:
+  title: LoadAPI test server
+  version: 1.0.0
+  description: |
+    Predictable target for load tests and scenario demos. No database:
+    data lives in memory (at most 100 000 entries per store, oldest evicted)
+    and is lost on restart.
+
+    Stall mode (env STALL_EVERY / STALL_FOR) freezes the server at the end of
+    every period: requests arriving in the window wait until it ends.
+servers:
+  - url: http://testserver:8080
+    description: From containers in the Docker network (LoadAPI worker)
+  - url: http://localhost:8080
+    description: From the host machine
+tags:
+  - name: load
+    description: Benchmark targets
+  - name: scenario
+    description: Demo API for scenarios (login → tasks)
+  - name: templating
+    description: Demo of body placeholders
+  - name: admin
+    description: Server statistics, not counted in them
+
+paths:
+  /fixed:
+    get:
+      tags: [load]
+      summary: Respond after a fixed delay with a body of a given size
+      parameters:
+        - name: delay
+          in: query
+          description: Go duration from 0 to 60s
+          schema: { type: string, example: 10ms }
+        - name: size
+          in: query
+          description: Body size in bytes, 0 to 1048576
+          schema: { type: integer, minimum: 0, maximum: 1048576, example: 1024 }
+      responses:
+        "200":
+          description: Body of `size` bytes
+          content:
+            text/plain:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/BadParameter" }
+
+  /status/{code}:
+    get:
+      tags: [load]
+      summary: Respond with the given status code and an empty body
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: integer, minimum: 200, maximum: 599, example: 429 }
+      responses:
+        default:
+          description: The requested status code
+        "400": { $ref: "#/components/responses/BadParameter" }
+
+  /flaky:
+    get:
+      tags: [load]
+      summary: Respond 500 with probability errorRate, otherwise 200
+      parameters:
+        - name: errorRate
+          in: query
+          schema: { type: number, minimum: 0, maximum: 1, example: 0.05 }
+        - name: delay
+          in: query
+          schema: { type: string, example: 10ms }
+      responses:
+        "200": { description: Success }
+        "500": { description: Simulated failure }
+        "400": { $ref: "#/components/responses/BadParameter" }
+
+  /auth/login:
+    post:
+      tags: [scenario]
+      summary: Get an access token (any non-empty email and password)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+            example: { email: demo@example.com, password: secret }
+      responses:
+        "200":
+          description: Token for the Authorization header
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /tasks:
+    post:
+      tags: [scenario]
+      summary: Create a task
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTaskRequest" }
+            example: { title: "task-{{$uuid}}" }
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /tasks/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, example: 1 }
+    get:
+      tags: [scenario]
+      summary: Get a task of the current user
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [scenario]
+      summary: Update the title and/or status of a task
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateTaskRequest" }
+            example: { status: done }
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [scenario]
+      summary: Delete a task
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users:
+    post:
+      tags: [templating]
+      summary: Register a user; a repeated email gives 409
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateUserRequest" }
+            example: { email: "{{$randomEmail}}", name: Demo }
+      responses:
+        "201":
+          description: Created user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /admin/stats:
+    get:
+      tags: [admin]
+      summary: Requests that arrived at the server, per second since start or reset
+      responses:
+        "200":
+          description: Arrival counts; perSecond[0] is the first second
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Stats" }
+
+  /admin/reset:
+    post:
+      tags: [admin]
+      summary: Reset counters and restart the stall schedule from now
+      responses:
+        "204": { description: Reset }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+    LoginResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        tokenType: { type: string, example: Bearer }
+    Task:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        status: { type: string, enum: [todo, in_progress, done] }
+        createdAt: { type: string, format: date-time }
+    TaskResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Task" }
+    CreateTaskRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        status: { type: string, enum: [todo, in_progress, done], default: todo }
+    UpdateTaskRequest:
+      type: object
+      properties:
+        title: { type: string }
+        status: { type: string, enum: [todo, in_progress, done] }
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        name: { type: string }
+    UserResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/User" }
+    CreateUserRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string }
+        name: { type: string }
+    Stats:
+      type: object
+      properties:
+        since: { type: string, format: date-time }
+        totalRequests: { type: integer }
+        perSecond:
+          type: array
+          items: { type: integer }
+
+  responses:
+    BadParameter:
+      description: Invalid query or path parameter
+      content:
+        text/plain:
+          schema: { type: string }
+    BadRequest:
+      description: Invalid body
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: No such task for this user
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Email already registered
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+</file>
+
+<file path="respond.go">
+package main
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+)
+
+const maxBodyBytes = 1 << 20
+
+type errorResponse struct {
+	Error string `json:"error"`
+}
+
+type dataResponse struct {
+	Data any `json:"data"`
+}
+
+func writeJSON(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(value)
+}
+
+func writeError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, errorResponse{Error: message})
+}
+
+func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("body must be at most %d bytes", maxBodyBytes))
+			return false
+		}
+		writeError(w, http.StatusBadRequest, "body must be valid JSON: "+err.Error())
+		return false
+	}
+	return true
+}
+</file>
+
+<file path="server_test.go">
+package main
+
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+)
+
+func newTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(newHandler(newTraffic(0, 0)))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func call(t *testing.T, method, url, token, body string) (int, map[string]any) {
+	t.Helper()
+	req, err := http.NewRequest(method, url, strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	raw, _ := io.ReadAll(resp.Body)
+	var decoded map[string]any
+	json.Unmarshal(raw, &decoded)
+	return resp.StatusCode, decoded
+}
+
+func TestFixed(t *testing.T) {
+	server := newTestServer(t)
+
+	start := time.Now()
+	resp, err := http.Get(server.URL + "/fixed?delay=100ms&size=2048")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	if elapsed := time.Since(start); elapsed < 100*time.Millisecond {
+		t.Errorf("answered after %v, want at least 100ms", elapsed)
+	}
+	if resp.StatusCode != http.StatusOK || len(body) != 2048 {
+		t.Errorf("got status %d and %d bytes, want 200 and 2048", resp.StatusCode, len(body))
+	}
+
+	for _, query := range []string{"delay=abc", "delay=-1s", "delay=2m", "size=-1", "size=abc", "size=2000000"} {
+		if status, _ := call(t, http.MethodGet, server.URL+"/fixed?"+query, "", ""); status != http.StatusBadRequest {
+			t.Errorf("/fixed?%s: status %d, want 400", query, status)
+		}
+	}
+}
+
+func TestStatusAndFlaky(t *testing.T) {
+	server := newTestServer(t)
+
+	tests := []struct {
+		path string
+		want int
+	}{
+		{"/status/429", 429},
+		{"/status/503", 503},
+		{"/status/99", 400},
+		{"/status/abc", 400},
+		{"/flaky?errorRate=1", 500},
+		{"/flaky?errorRate=0", 200},
+		{"/flaky?errorRate=2", 400},
+	}
+	for _, tt := range tests {
+		if status, _ := call(t, http.MethodGet, server.URL+tt.path, "", ""); status != tt.want {
+			t.Errorf("%s: status %d, want %d", tt.path, status, tt.want)
+		}
+	}
+}
+
+func TestTaskScenario(t *testing.T) {
+	server := newTestServer(t)
+
+	status, login := call(t, http.MethodPost, server.URL+"/auth/login", "", `{"email":"a@example.com","password":"x"}`)
+	if status != http.StatusOK {
+		t.Fatalf("login: status %d", status)
+	}
+	token := login["accessToken"].(string)
+
+	if status, _ := call(t, http.MethodPost, server.URL+"/tasks", "", `{"title":"t"}`); status != http.StatusUnauthorized {
+		t.Errorf("create without token: status %d, want 401", status)
+	}
+
+	status, created := call(t, http.MethodPost, server.URL+"/tasks", token, `{"title":"first"}`)
+	if status != http.StatusCreated {
+		t.Fatalf("create: status %d", status)
+	}
+	data := created["data"].(map[string]any)
+	id := jsonNumber(data["id"])
+	if data["status"] != "todo" {
+		t.Errorf("default status = %v, want todo", data["status"])
+	}
+
+	taskURL := server.URL + "/tasks/" + id
+	if status, _ := call(t, http.MethodPatch, taskURL, token, `{"status":"done"}`); status != http.StatusOK {
+		t.Errorf("patch: status %d", status)
+	}
+	if status, _ := call(t, http.MethodPatch, taskURL, token, `{"status":"lost"}`); status != http.StatusBadRequest {
+		t.Errorf("patch with invalid status: status %d, want 400", status)
+	}
+	if status, got := call(t, http.MethodGet, taskURL, token, ""); status != http.StatusOK || got["data"].(map[string]any)["status"] != "done" {
+		t.Errorf("get after patch: status %d, body %v", status, got)
+	}
+
+	_, other := call(t, http.MethodPost, server.URL+"/auth/login", "", `{"email":"b@example.com","password":"x"}`)
+	if status, _ := call(t, http.MethodGet, taskURL, other["accessToken"].(string), ""); status != http.StatusNotFound {
+		t.Errorf("someone else's task: status %d, want 404", status)
+	}
+
+	if status, _ := call(t, http.MethodDelete, taskURL, token, ""); status != http.StatusNoContent {
+		t.Errorf("delete: status %d", status)
+	}
+	if status, _ := call(t, http.MethodGet, taskURL, token, ""); status != http.StatusNotFound {
+		t.Errorf("get after delete: status %d, want 404", status)
+	}
+}
+
+func TestUsersConflict(t *testing.T) {
+	server := newTestServer(t)
+
+	body := `{"email":"Same@Example.com"}`
+	if status, _ := call(t, http.MethodPost, server.URL+"/users", "", body); status != http.StatusCreated {
+		t.Errorf("first create: status %d, want 201", status)
+	}
+	if status, _ := call(t, http.MethodPost, server.URL+"/users", "", `{"email":"same@example.com"}`); status != http.StatusConflict {
+		t.Errorf("repeated email: status %d, want 409", status)
+	}
+	if status, _ := call(t, http.MethodPost, server.URL+"/users", "", `not json`); status != http.StatusBadRequest {
+		t.Errorf("invalid JSON: status %d, want 400", status)
+	}
+	big := `{"email":"` + strings.Repeat("a", maxBodyBytes) + `@x"}`
+	if status, _ := call(t, http.MethodPost, server.URL+"/users", "", big); status != http.StatusRequestEntityTooLarge {
+		t.Errorf("body over the limit: status %d, want 413", status)
+	}
+}
+
+func TestAdminStatsCountsRequests(t *testing.T) {
+	server := newTestServer(t)
+
+	for range 5 {
+		call(t, http.MethodGet, server.URL+"/fixed", "", "")
+	}
+	_, stats := call(t, http.MethodGet, server.URL+"/admin/stats", "", "")
+	if stats["totalRequests"].(float64) != 5 {
+		t.Errorf("totalRequests = %v, want 5 (admin requests are not counted)", stats["totalRequests"])
+	}
+
+	call(t, http.MethodPost, server.URL+"/admin/reset", "", "")
+	_, stats = call(t, http.MethodGet, server.URL+"/admin/stats", "", "")
+	if stats["totalRequests"].(float64) != 0 {
+		t.Errorf("after reset totalRequests = %v, want 0", stats["totalRequests"])
+	}
+}
+
+func TestStallRemaining(t *testing.T) {
+	traffic := newTraffic(30*time.Second, 5*time.Second)
+
+	tests := []struct {
+		elapsed time.Duration
+		want    time.Duration
+	}{
+		{0, 0},
+		{24 * time.Second, 0},
+		{25 * time.Second, 5 * time.Second},
+		{28 * time.Second, 2 * time.Second},
+		{30 * time.Second, 0},
+		{57 * time.Second, 3 * time.Second},
+	}
+	for _, tt := range tests {
+		if got := traffic.stallRemaining(tt.elapsed); got != tt.want {
+			t.Errorf("stallRemaining(%v) = %v, want %v", tt.elapsed, got, tt.want)
+		}
+	}
+}
+
+func TestBoundedMapEvictsOldest(t *testing.T) {
+	m := newBoundedMap[string, int](2)
+	m.Add("a", 1)
+	m.Add("b", 2)
+	m.Add("c", 3)
+
+	if _, ok := m.Get("a"); ok {
+		t.Error("oldest key a is still present, want evicted")
+	}
+	if _, ok := m.Get("c"); !ok {
+		t.Error("newest key c is missing")
+	}
+	if m.Add("b", 20) {
+		t.Error("Add of an existing key succeeded, want false")
+	}
+	if m.Len() != 2 {
+		t.Errorf("Len() = %d, want 2", m.Len())
+	}
+}
+
+func jsonNumber(v any) string {
+	b, _ := json.Marshal(v)
+	return string(b)
+}
+</file>
+
+<file path="store.go">
+package main
+
+import "sync"
+
+type boundedMap[K comparable, V any] struct {
+	mu    sync.Mutex
+	items map[K]V
+	order []K // ring buffer of keys in insertion order
+	next  int // position the next new key goes to
+	count int // filled positions in order
+}
+
+func newBoundedMap[K comparable, V any](limit int) *boundedMap[K, V] {
+	return &boundedMap[K, V]{
+		items: make(map[K]V),
+		order: make([]K, limit),
+	}
+}
+
+func (m *boundedMap[K, V]) Get(key K) (V, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	value, ok := m.items[key]
+	return value, ok
+}
+
+func (m *boundedMap[K, V]) Add(key K, value V) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.items[key]; exists {
+		return false
+	}
+
+	if m.count == len(m.order) {
+		delete(m.items, m.order[m.next])
+	} else {
+		m.count++
+	}
+	m.order[m.next] = key
+	m.next = (m.next + 1) % len(m.order)
+	m.items[key] = value
+	return true
+}
+
+func (m *boundedMap[K, V]) Update(key K, update func(V) (V, error)) (V, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	old, ok := m.items[key]
+	if !ok {
+		var zero V
+		return zero, false, nil
+	}
+	value, err := update(old)
+	if err != nil {
+		return old, true, err
+	}
+	m.items[key] = value
+	return value, true, nil
+}
+
+func (m *boundedMap[K, V]) Delete(key K) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.items[key]; !ok {
+		return false
+	}
+	delete(m.items, key)
+	return true
+}
+
+func (m *boundedMap[K, V]) Len() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.items)
+}
+</file>
+
+<file path="tasks.go">
+package main
+
+import (
+	"errors"
+	"net/http"
+	"slices"
+	"strconv"
+	"sync/atomic"
+	"time"
+)
+
+const maxTasks = 100_000
+
+var taskStatuses = []string{"todo", "in_progress", "done"}
+
+type task struct {
+	ID        int64     `json:"id"`
+	Title     string    `json:"title"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"createdAt"`
+	owner     string
+}
+
+type taskStore struct {
+	tasks  *boundedMap[int64, task]
+	lastID atomic.Int64
+}
+
+type createTaskRequest struct {
+	Title  string `json:"title"`
+	Status string `json:"status"`
+}
+
+type updateTaskRequest struct {
+	Title  *string `json:"title"`
+	Status *string `json:"status"`
+}
+
+var errInvalidStatus = errors.New("status must be one of: todo, in_progress, done")
+
+func newTaskStore() *taskStore {
+	return &taskStore{tasks: newBoundedMap[int64, task](maxTasks)}
+}
+
+func (s *taskStore) handleCreate(w http.ResponseWriter, r *http.Request) {
+	var req createTaskRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if req.Title == "" {
+		writeError(w, http.StatusBadRequest, "title is required")
+		return
+	}
+	if req.Status == "" {
+		req.Status = "todo"
+	}
+	if !slices.Contains(taskStatuses, req.Status) {
+		writeError(w, http.StatusBadRequest, errInvalidStatus.Error())
+		return
+	}
+
+	t := task{
+		ID:        s.lastID.Add(1),
+		Title:     req.Title,
+		Status:    req.Status,
+		CreatedAt: time.Now().UTC().Truncate(time.Millisecond),
+		owner:     ownerFrom(r),
+	}
+	s.tasks.Add(t.ID, t)
+	writeJSON(w, http.StatusCreated, dataResponse{Data: t})
+}
+
+func (s *taskStore) handleGet(w http.ResponseWriter, r *http.Request) {
+	t, ok := s.find(r)
+	if !ok {
+		writeError(w, http.StatusNotFound, "task not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, dataResponse{Data: t})
+}
+
+func (s *taskStore) handleUpdate(w http.ResponseWriter, r *http.Request) {
+	id, ok := taskID(r)
+	if !ok {
+		writeError(w, http.StatusNotFound, "task not found")
+		return
+	}
+	var req updateTaskRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+
+	owner := ownerFrom(r)
+	updated, found, err := s.tasks.Update(id, func(t task) (task, error) {
+		if t.owner != owner {
+			return t, errNotOwner
+		}
+		if req.Title != nil {
+			t.Title = *req.Title
+		}
+		if req.Status != nil {
+			if !slices.Contains(taskStatuses, *req.Status) {
+				return t, errInvalidStatus
+			}
+			t.Status = *req.Status
+		}
+		return t, nil
+	})
+
+	switch {
+	case !found || errors.Is(err, errNotOwner):
+		writeError(w, http.StatusNotFound, "task not found")
+	case err != nil:
+		writeError(w, http.StatusBadRequest, err.Error())
+	default:
+		writeJSON(w, http.StatusOK, dataResponse{Data: updated})
+	}
+}
+
+func (s *taskStore) handleDelete(w http.ResponseWriter, r *http.Request) {
+	t, ok := s.find(r)
+	if !ok {
+		writeError(w, http.StatusNotFound, "task not found")
+		return
+	}
+	s.tasks.Delete(t.ID)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+var errNotOwner = errors.New("task belongs to another user")
+
+func (s *taskStore) find(r *http.Request) (task, bool) {
+	id, ok := taskID(r)
+	if !ok {
+		return task{}, false
+	}
+	t, ok := s.tasks.Get(id)
+	if !ok || t.owner != ownerFrom(r) {
+		return task{}, false
+	}
+	return t, true
+}
+
+func taskID(r *http.Request) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	return id, err == nil && id > 0
+}
+</file>
+
+<file path="traffic.go">
+package main
+
+import (
+	"net/http"
+	"strings"
+	"sync/atomic"
+	"time"
+)
+
+const maxSeconds = 3600
+
+type traffic struct {
+	anchor     atomic.Int64
+	total      atomic.Int64
+	perSecond  [maxSeconds]atomic.Int64
+	stallEvery time.Duration
+	stallFor   time.Duration
+}
+
+type statsResponse struct {
+	Since         time.Time `json:"since"`
+	TotalRequests int64     `json:"totalRequests"`
+	PerSecond     []int64   `json:"perSecond"`
+}
+
+func newTraffic(stallEvery, stallFor time.Duration) *traffic {
+	t := &traffic{stallEvery: stallEvery, stallFor: stallFor}
+	t.anchor.Store(time.Now().UnixNano())
+	return t
+}
+
+func (t *traffic) middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/admin/") || r.URL.Path == "/openapi.yaml" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		elapsed := t.elapsed(time.Now())
+		t.record(elapsed)
+		if !wait(r.Context(), t.stallRemaining(elapsed)) {
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (t *traffic) elapsed(now time.Time) time.Duration {
+	return time.Duration(now.UnixNano() - t.anchor.Load())
+}
+
+func (t *traffic) record(elapsed time.Duration) {
+	t.total.Add(1)
+	if second := int(elapsed / time.Second); second >= 0 && second < maxSeconds {
+		t.perSecond[second].Add(1)
+	}
+}
+
+func (t *traffic) stallRemaining(elapsed time.Duration) time.Duration {
+	if t.stallEvery == 0 || elapsed < 0 {
+		return 0
+	}
+	phase := elapsed % t.stallEvery
+	if start := t.stallEvery - t.stallFor; phase >= start {
+		return t.stallEvery - phase
+	}
+	return 0
+}
+
+func (t *traffic) handleStats(w http.ResponseWriter, r *http.Request) {
+	anchor := t.anchor.Load()
+	seconds := min(int(t.elapsed(time.Now())/time.Second)+1, maxSeconds)
+
+	perSecond := make([]int64, seconds)
+	for i := range perSecond {
+		perSecond[i] = t.perSecond[i].Load()
+	}
+
+	writeJSON(w, http.StatusOK, statsResponse{
+		Since:         time.Unix(0, anchor).UTC().Truncate(time.Millisecond),
+		TotalRequests: t.total.Load(),
+		PerSecond:     perSecond,
+	})
+}
+
+func (t *traffic) handleReset(w http.ResponseWriter, r *http.Request) {
+	for i := range t.perSecond {
+		t.perSecond[i].Store(0)
+	}
+	t.total.Store(0)
+	t.anchor.Store(time.Now().UnixNano())
+	w.WriteHeader(http.StatusNoContent)
+}
+</file>
+
+<file path="users.go">
+package main
+
+import (
+	"net/http"
+	"strings"
+	"sync/atomic"
+)
+
+const maxUsers = 100_000
+
+type user struct {
+	ID    int64  `json:"id"`
+	Email string `json:"email"`
+	Name  string `json:"name,omitempty"`
+}
+
+type userStore struct {
+	byEmail *boundedMap[string, user]
+	lastID  atomic.Int64
+}
+
+type createUserRequest struct {
+	Email string `json:"email"`
+	Name  string `json:"name"`
+}
+
+func newUserStore() *userStore {
+	return &userStore{byEmail: newBoundedMap[string, user](maxUsers)}
+}
+
+func (s *userStore) handleCreate(w http.ResponseWriter, r *http.Request) {
+	var req createUserRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	if !strings.Contains(email, "@") {
+		writeError(w, http.StatusBadRequest, "email is required and must contain @")
+		return
+	}
+
+	u := user{ID: s.lastID.Add(1), Email: email, Name: req.Name}
+	if !s.byEmail.Add(email, u) {
+		writeError(w, http.StatusConflict, "user with this email already exists")
+		return
+	}
+	writeJSON(w, http.StatusCreated, dataResponse{Data: u})
+}
+</file>
+
+</files>
