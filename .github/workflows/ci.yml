@@ -76,3 +76,28 @@ jobs:
 
       - name: Test
         run: go test -race ./...
+
+  testserver:
+    name: Test server
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/testserver
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/testserver/go.mod
+          cache: false
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
