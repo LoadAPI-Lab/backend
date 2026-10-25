@@ -35,9 +35,13 @@
         "moduleResolution": "bundler",
         "lib": ["ES2022"],
         "paths": {
+            "@libs/bootstrap": ["./libs/bootstrap/src"],
+            "@libs/bootstrap/*": ["./libs/bootstrap/src/*"],
+            "@libs/config": ["./libs/config/src"],
+            "@libs/config/*": ["./libs/config/src/*"],
             "@core/*": ["./src/*"]
         }
     },
-    "include": ["src/**/*", "test/**/*"],
+    "include": ["src/**/*", "libs/**/*", "test/**/*"],
     "exclude": ["dist", "node_modules"]
 }
