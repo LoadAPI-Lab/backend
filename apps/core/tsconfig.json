@@ -39,9 +39,12 @@
             "@libs/bootstrap/*": ["./libs/bootstrap/src/*"],
             "@libs/config": ["./libs/config/src"],
             "@libs/config/*": ["./libs/config/src/*"],
-            "@core/*": ["./src/*"]
+            "@libs/database": ["./libs/database/src"],
+            "@libs/database/*": ["./libs/database/src/*"],
+            "@core/*": ["./src/*"],
+            "@shared/*": ["./src/shared/*"]
         }
     },
-    "include": ["src/**/*", "libs/**/*", "test/**/*"],
+    "include": ["src/**/*", "libs/**/*", "test/**/*", "drizzle.config.ts"],
     "exclude": ["dist", "node_modules"]
 }
