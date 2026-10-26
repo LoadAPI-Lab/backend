@@ -1,9 +1,11 @@
-import { NestFactory } from '@nestjs/core';
+import { bootstrapApp } from '@libs/bootstrap';
 
 import { AppModule } from './app.module';
 
-async function bootstrap() {
-    const app = await NestFactory.create(AppModule);
-    await app.listen(process.env['PORT'] ?? 3000);
-}
-void bootstrap();
+bootstrapApp({
+    appModule: AppModule,
+    swagger: { title: 'LoadAPI', description: 'LoadAPI control plane', version: '0.1.0' },
+}).catch((error: unknown) => {
+    console.error('Failed to start:', error);
+    process.exit(1);
+});

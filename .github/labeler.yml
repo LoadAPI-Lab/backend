@@ -6,6 +6,12 @@ core:
           - '!apps/core/**/*.spec.ts'
           - '!apps/core/test/**'
 
+core/libs:
+  - changed-files:
+      - all-globs-to-any-file:
+          - 'apps/core/libs/**'
+          - '!apps/core/libs/database/**'
+
 core/db:
   - changed-files:
       - any-glob-to-any-file:
@@ -33,7 +39,6 @@ worker/engine:
   - changed-files:
       - any-glob-to-any-file:
           - 'apps/worker/internal/executor/**'
-          - 'apps/worker/internal/ratelimiter/**'
           - 'apps/worker/internal/httpclient/**'
 
 worker/metrics:
@@ -50,7 +55,8 @@ worker/transport:
   - changed-files:
       - any-glob-to-any-file:
           - 'apps/worker/cmd/**'
-          - 'apps/worker/internal/publisher/**'
+          - 'apps/worker/internal/adapter/**'
+          - 'apps/worker/internal/broker/**'
 
 # ---------- test server ----------
 testserver:
