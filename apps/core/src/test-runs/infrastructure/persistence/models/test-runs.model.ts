@@ -1,5 +1,6 @@
 import { index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
+import type { ScenarioConfig, SingleConfig } from '../../../domain/schemas';
 import { testRunStatusEnum, testTypeEnum } from './enums';
 
 export const testRuns = pgTable(
@@ -8,7 +9,7 @@ export const testRuns = pgTable(
         id: uuid().primaryKey(),
         type: testTypeEnum().notNull(),
         status: testRunStatusEnum().notNull(),
-        config: jsonb().$type<unknown>().notNull(),
+        config: jsonb().$type<SingleConfig | ScenarioConfig>().notNull(),
         reason: text(),
         result: jsonb().$type<unknown>(),
         createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

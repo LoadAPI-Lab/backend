@@ -1,9 +1,12 @@
 import { FINAL_STATUSES, type TestRunStatus, type TestType } from './constants';
+import type { ScenarioConfig, SingleConfig } from './schemas';
+
+export type TestRunConfig = SingleConfig | ScenarioConfig;
 
 interface TestRunState {
     readonly id: string;
     readonly type: TestType;
-    readonly config: unknown;
+    readonly config: TestRunConfig;
     readonly createdAt: Date;
     status: TestRunStatus;
     reason?: string;
@@ -22,7 +25,7 @@ const isFinalStatus = (status: TestRunStatus): boolean =>
 export class TestRun {
     private constructor(private readonly state: TestRunState) {}
 
-    static create(input: { type: TestType; config: unknown; now?: Date }): TestRun {
+    static create(input: { type: TestType; config: TestRunConfig; now?: Date }): TestRun {
         return new TestRun({
             id: crypto.randomUUID(),
             type: input.type,
@@ -36,7 +39,7 @@ export class TestRun {
         id: string;
         type: TestType;
         status: TestRunStatus;
-        config: unknown;
+        config: TestRunConfig;
         createdAt: Date;
         reason?: string;
         result?: unknown;
@@ -58,7 +61,7 @@ export class TestRun {
         return this.state.status;
     }
 
-    get config(): unknown {
+    get config(): TestRunConfig {
         return this.state.config;
     }
 

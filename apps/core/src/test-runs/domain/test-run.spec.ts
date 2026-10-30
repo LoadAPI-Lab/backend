@@ -1,5 +1,12 @@
 import { TEST_RUN_STATUSES, type TestRunStatus } from './constants';
+import type { SingleConfig } from './schemas';
 import { TestRun } from './test-run';
+
+const SINGLE_CONFIG: SingleConfig = {
+    target: { method: 'GET', url: 'https://api.example.com/users' },
+    targetRps: 10,
+    durationSeconds: 10,
+};
 
 const CREATED_AT = new Date('2026-01-01T00:00:00.000Z');
 const STARTED_AT = new Date('2026-01-01T00:01:00.000Z');
@@ -25,7 +32,7 @@ function restoreWith(
         id: 'fixed-id',
         type: 'single',
         status,
-        config: { foo: 'bar' },
+        config: SINGLE_CONFIG,
         createdAt: CREATED_AT,
         startedAt: startedAtFor(status),
         ...overrides,
@@ -60,7 +67,7 @@ describe('TestRun', () => {
 
         it('defaults createdAt to now when not given', () => {
             const before = Date.now();
-            const run = TestRun.create({ type: 'single', config: {} });
+            const run = TestRun.create({ type: 'single', config: SINGLE_CONFIG });
             const after = Date.now();
 
             expect(run.createdAt.getTime()).toBeGreaterThanOrEqual(before);

@@ -1,3 +1,4 @@
+import type { ScenarioConfig, SingleConfig } from '../../../domain/schemas';
 import { TestRun } from '../../../domain/test-run';
 import type { testRuns } from '../models';
 
@@ -9,7 +10,7 @@ export function toDomainTestRun(row: TestRunRow): TestRun {
         id: row.id,
         type: row.type,
         status: row.status,
-        config: row.config,
+        config: row.config as SingleConfig | ScenarioConfig,
         createdAt: row.createdAt,
         reason: row.reason ?? undefined,
         result: row.result ?? undefined,
