@@ -11,6 +11,7 @@ export default defineConfig({
     test: {
         alias: {
             '@core': path.resolve(__dirname, './src'),
+            '@shared': path.resolve(__dirname, './src/shared'),
         },
         environment: 'node',
         exclude: [
