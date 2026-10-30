@@ -6,6 +6,7 @@ import * as schema from '@shared/entities';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { TestRunsModule } from './test-runs/test-runs.module';
 
 @Module({
     imports: [
@@ -18,6 +19,7 @@ import { AppService } from './app.service';
                 logging: cfg.get('NODE_ENV') !== 'production',
             }),
         }),
+        TestRunsModule,
     ],
     controllers: [AppController],
     providers: [AppService],
