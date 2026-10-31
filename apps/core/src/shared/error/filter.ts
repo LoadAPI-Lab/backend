@@ -114,7 +114,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         const { request, response } = this.getCtxBase(host);
         const status = exception.getStatus();
         const error = exception.getResponse() as IErrorOptions;
-        const {cause} = exception;
+        const { cause } = exception;
 
         this.log(host, status, {
             message: `Business exception on ${request.method} ${this.pathOf(request)}: ${error.code}`,

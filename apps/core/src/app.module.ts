@@ -1,5 +1,6 @@
 import { ConfigModule } from '@libs/config';
 import { DatabaseModule } from '@libs/database';
+import { RabbitMqModule } from '@libs/rabbitmq';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
@@ -21,6 +22,7 @@ import { TestRunsModule } from './test-runs/test-runs.module';
                 logging: cfg.get('NODE_ENV') !== 'production',
             }),
         }),
+        RabbitMqModule,
         TestRunsModule,
     ],
     providers: [

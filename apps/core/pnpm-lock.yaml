@@ -41,6 +41,12 @@ importers:
       '@paralleldrive/cuid2':
         specifier: ^3.3.0
         version: 3.3.0
+      amqp-connection-manager:
+        specifier: ^5.0.1
+        version: 5.0.1(amqplib@2.2.0)
+      amqplib:
+        specifier: ^2.2.0
+        version: 2.2.0
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(postgres@3.4.9)
@@ -78,6 +84,9 @@ importers:
       '@nestjs/testing':
         specifier: ^12.2.0
         version: 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.2.0)(@nestjs/platform-express@12.1.1)
+      '@types/amqplib':
+        specifier: ^0.10.8
+        version: 0.10.8
       '@types/node':
         specifier: ^24.0.0
         version: 24.19.0
@@ -1403,6 +1412,12 @@ packages:
   '@tsconfig/node16@1.0.4':
     resolution: {integrity: sha512-vxhUy4J8lyeyinH7Azl1pdd43GJhZH/tP2weN8TntQblOY+A0XbT8DJk1/oCPuOOyg/Ja757rG0CgHcWC8OfMA==}
 
+  '@types/amqplib@0.10.8':
+    resolution: {integrity: sha512-vtDp8Pk1wsE/AuQ8/Rgtm6KUZYqcnTgNvEHwzCkX8rL7AGsC6zqAfKAAJhUZXFhM/Pp++tbnUHiam/8vVpPztA==}
+
+  '@types/chai-as-promised@8.0.2':
+    resolution: {integrity: sha512-meQ1wDr1K5KRCSvG2lX7n7/5wf70BeptTKst0axGvnN6zqaVpRqegoIbugiAPSqOW9K9aL8gDVrm7a2LXOtn2Q==}
+
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
 
@@ -1529,6 +1544,16 @@ packages:
 
   ajv@8.20.0:
     resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
+
+  amqp-connection-manager@5.0.1:
+    resolution: {integrity: sha512-VclpgvjFSiK6D2LDcZfvqLHZ8dC0xbtmuyMRlzKe9PqWRn6uvTelxzKbWBlQzOeM+2MUK6m6f93o4ia/5NGuig==}
+    engines: {node: '>=22.0.0'}
+    peerDependencies:
+      amqplib: '*'
+
+  amqplib@2.2.0:
+    resolution: {integrity: sha512-VifzN9aHs/Q3zTruVHXh2yCisQyXexBN91CQ2E5iSyUKyNjH6ilYhJGte5AXZH/Bj1PaH7SwPhyuSf6Msd2udw==}
+    engines: {node: '>=18'}
 
   ansi-regex@5.0.1:
     resolution: {integrity: sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==}
@@ -2574,6 +2599,9 @@ packages:
   process-warning@5.1.1:
     resolution: {integrity: sha512-oCkNVj4OKnKEcocVBcDfiIugN1/cE6rgfT3nCtzeqZPA8+rIxMaQ0xXzIkGP8Gj2qUaP1UR7uhJ1VD8lUCpzCg==}
 
+  promise-breaker@7.0.0:
+    resolution: {integrity: sha512-bjYI+g+J8NZEugNDu1+Mp7emS2lyGbDnhJ/6hFqUwnyvfMnpQ+ZhTXQjibRcJg6n/D+YlHRv3mXrkA3Gz0URcg==}
+
   proxy-addr@2.0.8:
     resolution: {integrity: sha512-5nnx0yGyVUcY6t9RnWcARWtwT9F1D8O9rt08htPvnd49W1IgZtmLkhu9WfMzQj1cFxjHIO6connUNVW5k7AVyQ==}
     engines: {node: '>= 0.10'}
@@ -2887,6 +2915,9 @@ packages:
   type-is@2.1.0:
     resolution: {integrity: sha512-faYHw0anBbc/kWF3zFTEnxSFOAGUX9GFbOBthvDdLsIlEoWOFOtS0zgCiQYwIskL9iGXZL3kAXD8OoZ4GmMATA==}
     engines: {node: '>= 18'}
+
+  typed-emitter@2.1.0:
+    resolution: {integrity: sha512-g/KzbYKbH5C2vPkaXGu8DJlHrGKHLsM25Zg9WuC9pMGfuvT+X25tZQWo5fK1BjBm8+UrVE9LDCvaY0CQk+fXDA==}
 
   typescript@6.0.3:
     resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
@@ -3938,6 +3969,14 @@ snapshots:
 
   '@tsconfig/node16@1.0.4': {}
 
+  '@types/amqplib@0.10.8':
+    dependencies:
+      '@types/node': 24.19.0
+
+  '@types/chai-as-promised@8.0.2':
+    dependencies:
+      '@types/chai': 5.2.3
+
   '@types/chai@5.2.3':
     dependencies:
       '@types/deep-eql': 4.0.2
@@ -4110,6 +4149,15 @@ snapshots:
       fast-uri: 3.1.8
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
+
+  amqp-connection-manager@5.0.1(amqplib@2.2.0):
+    dependencies:
+      '@types/chai-as-promised': 8.0.2
+      amqplib: 2.2.0
+      promise-breaker: 7.0.0
+      typed-emitter: 2.1.0
+
+  amqplib@2.2.0: {}
 
   ansi-regex@5.0.1: {}
 
@@ -5080,6 +5128,8 @@ snapshots:
 
   process-warning@5.1.1: {}
 
+  promise-breaker@7.0.0: {}
+
   proxy-addr@2.0.8:
     dependencies:
       forwarded: 0.2.0
@@ -5443,6 +5493,10 @@ snapshots:
       media-typer: 1.1.1
       mime-types: 3.0.2
     optional: true
+
+  typed-emitter@2.1.0:
+    optionalDependencies:
+      rxjs: 7.8.2
 
   typescript@6.0.3: {}
 
