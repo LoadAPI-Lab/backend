@@ -72,6 +72,9 @@ export default defineConfig({
                 '**/*.resolver.ts',
                 '**/*.decorator.ts',
                 '**/*.exception.ts',
+                '**/*.use-case.ts',
+                '**/*.repository.ts',
+                '**/*.consumer.ts',
             ],
             rules: {
                 'typescript/consistent-type-imports': 'off',

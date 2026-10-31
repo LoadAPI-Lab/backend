@@ -1,5 +1,5 @@
 import { FINAL_STATUSES, type TestRunStatus, type TestType } from './constants';
-import type { ScenarioConfig, SingleConfig } from './schemas';
+import type { ScenarioConfig, SingleConfig, TestConfigInput } from './schemas';
 
 export type TestRunConfig = SingleConfig | ScenarioConfig;
 
@@ -25,7 +25,7 @@ const isFinalStatus = (status: TestRunStatus): boolean =>
 export class TestRun {
     private constructor(private readonly state: TestRunState) {}
 
-    static create(input: { type: TestType; config: TestRunConfig; now?: Date }): TestRun {
+    static create(input: TestConfigInput & { now?: Date }): TestRun {
         return new TestRun({
             id: crypto.randomUUID(),
             type: input.type,
