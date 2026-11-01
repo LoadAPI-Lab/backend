@@ -16,5 +16,8 @@ export const testRuns = pgTable(
         startedAt: timestamp({ withTimezone: true }),
         finishedAt: timestamp({ withTimezone: true }),
     },
-    (table) => [index('test_runs_status_idx').on(table.status)],
+    (table) => [
+        index('test_runs_status_idx').on(table.status),
+        index('test_runs_created_at_idx').on(table.createdAt.desc(), table.id.desc()),
+    ],
 );

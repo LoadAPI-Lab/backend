@@ -95,6 +95,18 @@ class InMemoryTestRunsRepository implements TestRunsRepository {
         this.stored = run;
         return true;
     }
+
+    async countActive(): Promise<number> {
+        return 0;
+    }
+
+    async findActive(): Promise<TestRun[]> {
+        return [];
+    }
+
+    async findPage(): Promise<TestRun[]> {
+        return [];
+    }
 }
 
 const noopLiveFeed: LiveFeed = {

@@ -58,6 +58,18 @@ class FakeTestRunsRepository implements TestRunsRepository {
     async updateIfStatus(): Promise<boolean> {
         return false;
     }
+
+    async countActive(): Promise<number> {
+        return 0;
+    }
+
+    async findActive(): Promise<TestRun[]> {
+        return [];
+    }
+
+    async findPage(): Promise<TestRun[]> {
+        return [];
+    }
 }
 
 class FakeLiveFeed implements LiveFeed {

@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { BaseException } from '@shared/error';
 
 import { TestRunStatus } from '../../domain/constants';
@@ -13,12 +14,28 @@ const ENQUEUE_FAILED_REASON = 'failed to enqueue the job';
 
 @Injectable()
 export class StartTestRunUseCase {
+    private readonly maxConcurrentTests: number;
+
     constructor(
         private readonly repository: TestRunsRepository,
         private readonly orchestrator: WorkerOrchestrator,
-    ) {}
+        configService: ConfigService,
+    ) {
+        this.maxConcurrentTests = configService.getOrThrow('MAX_CONCURRENT_TESTS');
+    }
 
     async execute(input: TestConfigInput): Promise<StartTestRunResponse> {
+        const activeRuns = await this.repository.countActive();
+        if (activeRuns >= this.maxConcurrentTests) {
+            throw new BaseException(
+                {
+                    code: TestRunErrorCodes.CAPACITY_EXCEEDED,
+                    message: TestRunErrorMessages[TestRunErrorCodes.CAPACITY_EXCEEDED],
+                },
+                HttpStatus.SERVICE_UNAVAILABLE,
+            );
+        }
+
         const run = TestRun.create(input);
         await this.repository.create(run);
 

@@ -4,6 +4,7 @@ import { ApiConflict, ApiNotFound, ApiServiceUnavailable, ApiValidationError } f
 import { ZOD_RESPONSE_TOKEN } from '@shared/interceptors';
 
 import {
+    ListTestRunsResponseDto,
     StartTestRunDto,
     StartTestRunResponseDto,
     StopTestRunResponseDto,
@@ -23,7 +24,9 @@ export const StartTestRunSwagger = () =>
             type: StartTestRunResponseDto,
         }),
         ApiValidationError(),
-        ApiServiceUnavailable('Failed to enqueue the test job'),
+        ApiServiceUnavailable(
+            'Too many test runs are in progress, or the test job could not be enqueued',
+        ),
         SetMetadata(ZOD_RESPONSE_TOKEN, StartTestRunResponseDto),
     );
 
@@ -41,6 +44,22 @@ export const GetTestRunSwagger = () =>
         ApiValidationError(),
         ApiNotFound('Test run not found'),
         SetMetadata(ZOD_RESPONSE_TOKEN, TestRunResponseDto),
+    );
+
+export const ListTestRunsSwagger = () =>
+    applyDecorators(
+        ApiOperation({
+            summary: 'List test runs',
+            description:
+                'Returns the run history, newest first, with cursor pagination. Configs and results are never included.',
+        }),
+        ApiResponse({
+            status: HttpStatus.OK,
+            description: 'A page of test runs',
+            type: ListTestRunsResponseDto,
+        }),
+        ApiValidationError(),
+        SetMetadata(ZOD_RESPONSE_TOKEN, ListTestRunsResponseDto),
     );
 
 export const StopTestRunSwagger = () =>

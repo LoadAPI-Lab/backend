@@ -15,6 +15,8 @@ export const TEST_RUN_STATUSES = [
     TestRunStatus.STOPPED,
 ] as const;
 
+export const ACTIVE_STATUSES = [TestRunStatus.PENDING, TestRunStatus.RUNNING] as const;
+
 export const FINAL_STATUSES = [
     TestRunStatus.COMPLETED,
     TestRunStatus.FAILED,

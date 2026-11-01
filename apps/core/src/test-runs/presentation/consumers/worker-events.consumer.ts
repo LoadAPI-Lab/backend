@@ -8,6 +8,7 @@ import {
     type OnApplicationBootstrap,
     type OnModuleDestroy,
 } from '@nestjs/common';
+import { describeError } from '@shared/error';
 import type { AmqpConnectionManager, ChannelWrapper } from 'amqp-connection-manager';
 import type { ConfirmChannel, ConsumeMessage } from 'amqplib';
 
@@ -35,16 +36,6 @@ function parseBody(content: Buffer): ParsedBody {
     }
 
     return { event: parsed.data };
-}
-
-function describeError(error: unknown): string {
-    if (!(error instanceof Error)) {
-        return 'unknown error';
-    }
-
-    const { cause } = error;
-    const code = cause instanceof Object && 'code' in cause ? String(cause.code) : undefined;
-    return code ? `${error.name} (${code})` : error.name;
 }
 
 @Injectable()

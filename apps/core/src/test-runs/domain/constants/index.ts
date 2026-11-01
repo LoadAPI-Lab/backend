@@ -1,3 +1,4 @@
+export * from './failure-reason';
 export * from './http-methods';
 export * from './limits';
 export * from './live-event-type';

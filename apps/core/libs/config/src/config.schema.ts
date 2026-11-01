@@ -49,6 +49,12 @@ export const ConfigSchema = z.object({
 
     THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
     THROTTLE_TTL_MS: z.coerce.number().int().positive().default(60_000),
+
+    MAX_CONCURRENT_TESTS: z.coerce.number().int().positive().default(1),
+    PENDING_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+    RUNNING_GRACE_MS: z.coerce.number().int().positive().default(30_000),
+    WORKER_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+    WATCHDOG_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

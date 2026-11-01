@@ -6,6 +6,7 @@ import {
     type MessageEvent,
     Param,
     Post,
+    Query,
     Sse,
     UseGuards,
 } from '@nestjs/common';
@@ -13,6 +14,8 @@ import { ApiBaseController, SkipContract } from '@shared/decorators';
 import { map, type Observable } from 'rxjs';
 
 import {
+    type ListTestRunsResponse,
+    ListTestRunsQueryDto,
     StartTestRunDto,
     type StartTestRunResponse,
     type StopTestRunResponse,
@@ -21,6 +24,7 @@ import {
 } from '../../../application/dtos';
 import {
     GetTestRunUseCase,
+    ListTestRunsUseCase,
     StartTestRunUseCase,
     StopTestRunUseCase,
     WatchTestRunUseCase,
@@ -28,6 +32,7 @@ import {
 import { TestRunExistsGuard } from '../../guards';
 import {
     GetTestRunSwagger,
+    ListTestRunsSwagger,
     StartTestRunSwagger,
     StopTestRunSwagger,
     WatchTestRunSwagger,
@@ -38,6 +43,7 @@ export class TestRunsController {
     constructor(
         private readonly startTestRun: StartTestRunUseCase,
         private readonly getTestRun: GetTestRunUseCase,
+        private readonly listTestRuns: ListTestRunsUseCase,
         private readonly stopTestRun: StopTestRunUseCase,
         private readonly watchTestRun: WatchTestRunUseCase,
     ) {}
@@ -46,6 +52,12 @@ export class TestRunsController {
     @StartTestRunSwagger()
     start(@Body() dto: StartTestRunDto): Promise<StartTestRunResponse> {
         return this.startTestRun.execute(dto);
+    }
+
+    @Get()
+    @ListTestRunsSwagger()
+    list(@Query() query: ListTestRunsQueryDto): Promise<ListTestRunsResponse> {
+        return this.listTestRuns.execute(query);
     }
 
     @Get(':id')

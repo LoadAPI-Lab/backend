@@ -27,6 +27,8 @@ Multiple workers:
 docker compose -f infra/docker-compose.yml up -d --build --scale worker=3
 ```
 
+`MAX_CONCURRENT_TESTS` in `apps/core/.env` must equal the number of worker replicas.
+
 | Service | URL |
 |---|---|
 | Core | API http://localhost:3001/v1, Swagger http://localhost:3001/docs |

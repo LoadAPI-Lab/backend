@@ -3,6 +3,8 @@ import type { ScenarioConfig, SingleConfig, TestConfigInput } from './schemas';
 
 export type TestRunConfig = SingleConfig | ScenarioConfig;
 
+const MS_PER_SECOND = 1000;
+
 interface TestRunState {
     readonly id: string;
     readonly type: TestType;
@@ -140,5 +142,15 @@ export class TestRun {
         }
 
         return now.getTime() - this.state.createdAt.getTime() > maxPendingMs;
+    }
+
+    maxRunningMs(requestTimeoutMs: number, graceMs: number): number {
+        const { config } = this.state;
+
+        if ('steps' in config) {
+            return config.steps.length * requestTimeoutMs + graceMs;
+        }
+
+        return config.durationSeconds * MS_PER_SECOND + requestTimeoutMs + graceMs;
     }
 }
