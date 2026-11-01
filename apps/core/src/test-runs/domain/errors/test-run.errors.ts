@@ -1,9 +1,11 @@
+import { ErrorCode } from '@shared/error';
+
 export const TestRunErrorCodes = {
     ENQUEUE_FAILED: 'TEST_RUN.ENQUEUE_FAILED',
     NOT_FOUND: 'TEST_RUN.NOT_FOUND',
     ALREADY_FINISHED: 'TEST_RUN.ALREADY_FINISHED',
     CAPACITY_EXCEEDED: 'TEST_RUN.CAPACITY_EXCEEDED',
-    INVALID_CURSOR: 'VALIDATION_FAILED',
+    INVALID_CURSOR: ErrorCode.VALIDATION_FAILED,
 } as const;
 
 export type TestRunErrorCode = (typeof TestRunErrorCodes)[keyof typeof TestRunErrorCodes];

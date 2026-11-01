@@ -1,4 +1,4 @@
-import { jwtSecretValidation } from '@libs/config/helpers/jwt-secren-validation';
+import { jwtSecretValidation } from '@libs/config/helpers/jwt-secret-validation';
 import { z } from 'zod/v4';
 
 import { NodeEnv } from './constants';
@@ -14,7 +14,7 @@ const jwtSecret = (name: string) =>
 
 export const ConfigSchema = z.object({
     NODE_ENV: z.enum(NodeEnv).default(NodeEnv.DEVELOPMENT),
-    PORT: z.coerce.number().int().positive().default(3000),
+    PORT: z.coerce.number().int().positive().default(3001),
 
     API_PUBLIC_URL: z.url().optional(),
     FRONTEND_URL: z.url(),
