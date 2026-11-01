@@ -4,4 +4,5 @@ export default {
         'pnpm -C apps/core exec oxlint --fix --no-error-on-unmatched-pattern',
     ],
     'apps/worker/**/*.go': ['gofmt -w'],
+    'apps/testserver/**/*.go': ['gofmt -w'],
 };

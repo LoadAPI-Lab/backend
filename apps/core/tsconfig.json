@@ -41,6 +41,12 @@
             "@libs/config/*": ["./libs/config/src/*"],
             "@libs/database": ["./libs/database/src"],
             "@libs/database/*": ["./libs/database/src/*"],
+            "@libs/health": ["./libs/health/src"],
+            "@libs/health/*": ["./libs/health/src/*"],
+            "@libs/rabbitmq": ["./libs/rabbitmq/src"],
+            "@libs/rabbitmq/*": ["./libs/rabbitmq/src/*"],
+            "@libs/redis": ["./libs/redis/src"],
+            "@libs/redis/*": ["./libs/redis/src/*"],
             "@core/*": ["./src/*"],
             "@shared/*": ["./src/shared/*"]
         }

@@ -72,6 +72,9 @@ export default defineConfig({
                 '**/*.resolver.ts',
                 '**/*.decorator.ts',
                 '**/*.exception.ts',
+                '**/*.use-case.ts',
+                '**/*.repository.ts',
+                '**/*.consumer.ts',
             ],
             rules: {
                 'typescript/consistent-type-imports': 'off',
@@ -242,17 +245,17 @@ export default defineConfig({
         'no-restricted-properties': [
             'error',
             {
-                message: 'Используйте slice/spread вместо pop',
+                message: 'Use slice/spread instead of pop',
                 object: 'Array',
                 property: 'pop',
             },
             {
-                message: 'Используйте filter/slice вместо splice',
+                message: 'Use filter/slice instead of splice',
                 object: 'Array',
                 property: 'splice',
             },
             {
-                message: 'Используйте spread оператор: {...obj, newProp} вместо Object.assign',
+                message: 'Use the spread operator: {...obj, newProp} instead of Object.assign',
                 object: 'Object',
                 property: 'assign',
             },

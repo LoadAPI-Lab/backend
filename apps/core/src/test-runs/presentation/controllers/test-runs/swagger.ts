@@ -1,0 +1,93 @@
+import { applyDecorators, HttpStatus, SetMetadata } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiProduces, ApiResponse } from '@nestjs/swagger';
+import { ApiConflict, ApiNotFound, ApiServiceUnavailable, ApiValidationError } from '@shared/error';
+import { ZOD_RESPONSE_TOKEN } from '@shared/interceptors';
+
+import {
+    ListTestRunsResponseDto,
+    StartTestRunDto,
+    StartTestRunResponseDto,
+    StopTestRunResponseDto,
+    TestRunResponseDto,
+} from '../../../application/dtos';
+
+export const StartTestRunSwagger = () =>
+    applyDecorators(
+        ApiOperation({
+            summary: 'Start a test run',
+            description: 'Validates the config, stores a PENDING run and enqueues the job.',
+        }),
+        ApiBody({ type: StartTestRunDto }),
+        ApiResponse({
+            status: HttpStatus.CREATED,
+            description: 'The test run was created and enqueued',
+            type: StartTestRunResponseDto,
+        }),
+        ApiValidationError(),
+        ApiServiceUnavailable(
+            'Too many test runs are in progress, or the test job could not be enqueued',
+        ),
+        SetMetadata(ZOD_RESPONSE_TOKEN, StartTestRunResponseDto),
+    );
+
+export const GetTestRunSwagger = () =>
+    applyDecorators(
+        ApiOperation({
+            summary: 'Get a test run',
+            description: 'Returns the run status and final result. The config is never included.',
+        }),
+        ApiResponse({
+            status: HttpStatus.OK,
+            description: 'The test run',
+            type: TestRunResponseDto,
+        }),
+        ApiValidationError(),
+        ApiNotFound('Test run not found'),
+        SetMetadata(ZOD_RESPONSE_TOKEN, TestRunResponseDto),
+    );
+
+export const ListTestRunsSwagger = () =>
+    applyDecorators(
+        ApiOperation({
+            summary: 'List test runs',
+            description:
+                'Returns the run history, newest first, with cursor pagination. Configs and results are never included.',
+        }),
+        ApiResponse({
+            status: HttpStatus.OK,
+            description: 'A page of test runs',
+            type: ListTestRunsResponseDto,
+        }),
+        ApiValidationError(),
+        SetMetadata(ZOD_RESPONSE_TOKEN, ListTestRunsResponseDto),
+    );
+
+export const StopTestRunSwagger = () =>
+    applyDecorators(
+        ApiOperation({
+            summary: 'Stop a test run',
+            description:
+                'Requests a stop and returns the current status. The status becomes STOPPED once the worker reports the run as finished.',
+        }),
+        ApiResponse({
+            status: HttpStatus.ACCEPTED,
+            description: 'The stop was requested',
+            type: StopTestRunResponseDto,
+        }),
+        ApiValidationError(),
+        ApiNotFound('Test run not found'),
+        ApiConflict('Test run has already finished'),
+        SetMetadata(ZOD_RESPONSE_TOKEN, StopTestRunResponseDto),
+    );
+
+export const WatchTestRunSwagger = () =>
+    applyDecorators(
+        ApiOperation({
+            summary: 'Stream live metrics of a test run',
+            description:
+                "Server-sent events. 'status' carries { status, reason? }: the current status right after connecting, then every change. 'snapshot' carries the per-second metrics of the run. The stream closes when the run reaches a final status.",
+        }),
+        ApiProduces('text/event-stream'),
+        ApiValidationError(),
+        ApiNotFound('Test run not found'),
+    );

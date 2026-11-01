@@ -11,6 +11,11 @@ export default defineConfig({
     test: {
         alias: {
             '@core': path.resolve(__dirname, './src'),
+            '@libs/config': path.resolve(__dirname, './libs/config/src'),
+            '@libs/health': path.resolve(__dirname, './libs/health/src'),
+            '@libs/rabbitmq': path.resolve(__dirname, './libs/rabbitmq/src'),
+            '@libs/redis': path.resolve(__dirname, './libs/redis/src'),
+            '@shared': path.resolve(__dirname, './src/shared'),
         },
         environment: 'node',
         exclude: [

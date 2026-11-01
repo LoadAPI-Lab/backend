@@ -32,9 +32,8 @@ import { MigrationService } from './migration.service';
                     onnotice: (msg) => new Logger('PostgresJS').verbose(msg),
                     backoff: (attempt) => Math.min(attempt * 100, 3000),
                     target_session_attrs: 'read-write',
-                    publications: 'alltables',
                     connect_timeout: 2,
-                    idle_timeout: 5,
+                    idle_timeout: 30,
                     max_lifetime: 60 * 60,
                     keep_alive: 30,
                     transform: {

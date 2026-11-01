@@ -1,5 +1,6 @@
 import fastifyCompress from '@fastify/compress';
 import fastifyCookie from '@fastify/cookie';
+import { NodeEnv } from '@libs/config';
 import { Logger, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -19,14 +20,13 @@ export async function bootstrapApp(options: BootstrapOptions) {
 
     const app = await NestFactory.create<NestFastifyApplication>(withThrottler(appModule), adapter);
     const cfg = app.get(ConfigService);
-    const isProduction = cfg.get('NODE_ENV') === 'production';
+    const isProduction = cfg.get('NODE_ENV') === NodeEnv.PRODUCTION;
     const port = cfg.get('PORT');
 
     app.enableShutdownHooks();
     setupLogger(app, 'core', isProduction);
     addFastifyHooks(app);
 
-    // TODO: exclude SSE route from compression
     await app.register(fastifyCompress, { global: true, threshold: 1024 });
     await app.register(fastifyCookie, {
         secret: cfg.get('COOKIE_SECRET'),
