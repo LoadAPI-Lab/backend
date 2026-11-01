@@ -24,7 +24,7 @@ type FinishInput =
       }
     | { status: typeof TestRunStatus.FAILED; reason: string; finishedAt: Date; startedAt?: Date };
 
-const isFinalStatus = (status: TestRunStatus): boolean =>
+export const isFinalStatus = (status: TestRunStatus): boolean =>
     (FINAL_STATUSES as readonly string[]).includes(status);
 
 export class TestRun {

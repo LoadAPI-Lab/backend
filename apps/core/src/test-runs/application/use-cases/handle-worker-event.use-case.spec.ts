@@ -1,4 +1,7 @@
+import { EMPTY } from 'rxjs';
+
 import { HttpMethod, TestRunStatus, TestType, WorkerEventType } from '../../domain/constants';
+import type { LiveFeed } from '../../domain/ports';
 import { TestRunsRepository } from '../../domain/repositories';
 import type { SingleConfig } from '../../domain/schemas';
 import { TestRun } from '../../domain/test-run';
@@ -94,13 +97,18 @@ class InMemoryTestRunsRepository implements TestRunsRepository {
     }
 }
 
+const noopLiveFeed: LiveFeed = {
+    watch: () => EMPTY,
+    publishStatus: vi.fn(),
+};
+
 describe('HandleWorkerEventUseCase', () => {
     let repository: InMemoryTestRunsRepository;
     let useCase: HandleWorkerEventUseCase;
 
     beforeEach(() => {
         repository = new InMemoryTestRunsRepository();
-        useCase = new HandleWorkerEventUseCase(repository);
+        useCase = new HandleWorkerEventUseCase(repository, noopLiveFeed);
     });
 
     it('applies started on a PENDING run and moves it to RUNNING', async () => {

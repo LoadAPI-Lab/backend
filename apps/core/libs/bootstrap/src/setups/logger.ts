@@ -72,11 +72,13 @@ class RequestLoggingInterceptor implements NestInterceptor {
         });
 
         return next.handle().pipe(
-            tap(() => {
-                this.logger.log({
-                    message: `<-- ${meta.method} ${meta.path} ${Date.now() - startedAt}ms`,
-                    ...meta,
-                });
+            tap({
+                complete: () => {
+                    this.logger.log({
+                        message: `<-- ${meta.method} ${meta.path} ${Date.now() - startedAt}ms`,
+                        ...meta,
+                    });
+                },
             }),
             catchError((error: { status?: number }) => {
                 this.logger.warn({

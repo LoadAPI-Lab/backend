@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { TestRunStatus, WorkerEventType } from '../../domain/constants';
+import { LiveFeed } from '../../domain/ports';
 import { TestRunsRepository } from '../../domain/repositories';
 import type { TestRun } from '../../domain/test-run';
 import type { FinishedEvent, WorkerEvent } from '../dtos';
@@ -14,7 +15,10 @@ export type WorkerEventOutcome = (typeof WorkerEventOutcome)[keyof typeof Worker
 
 @Injectable()
 export class HandleWorkerEventUseCase {
-    constructor(private readonly repository: TestRunsRepository) {}
+    constructor(
+        private readonly repository: TestRunsRepository,
+        private readonly liveFeed: LiveFeed,
+    ) {}
 
     async execute(event: WorkerEvent): Promise<WorkerEventOutcome> {
         const run = await this.repository.findById(event.testId);
@@ -32,7 +36,12 @@ export class HandleWorkerEventUseCase {
         }
 
         const updated = await this.repository.updateIfStatus(run, previousStatus);
-        return updated ? WorkerEventOutcome.APPLIED : WorkerEventOutcome.IGNORED;
+        if (!updated) {
+            return WorkerEventOutcome.IGNORED;
+        }
+
+        this.liveFeed.publishStatus(run.id, run.status, run.reason);
+        return WorkerEventOutcome.APPLIED;
     }
 
     private finish(run: TestRun, event: FinishedEvent): boolean {

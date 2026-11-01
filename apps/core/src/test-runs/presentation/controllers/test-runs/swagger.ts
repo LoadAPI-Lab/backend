@@ -1,5 +1,5 @@
 import { applyDecorators, HttpStatus, SetMetadata } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiProduces, ApiResponse } from '@nestjs/swagger';
 import { ApiConflict, ApiNotFound, ApiServiceUnavailable, ApiValidationError } from '@shared/error';
 import { ZOD_RESPONSE_TOKEN } from '@shared/interceptors';
 
@@ -59,4 +59,16 @@ export const StopTestRunSwagger = () =>
         ApiNotFound('Test run not found'),
         ApiConflict('Test run has already finished'),
         SetMetadata(ZOD_RESPONSE_TOKEN, StopTestRunResponseDto),
+    );
+
+export const WatchTestRunSwagger = () =>
+    applyDecorators(
+        ApiOperation({
+            summary: 'Stream live metrics of a test run',
+            description:
+                "Server-sent events. 'status' carries { status, reason? }: the current status right after connecting, then every change. 'snapshot' carries the per-second metrics of the run. The stream closes when the run reaches a final status.",
+        }),
+        ApiProduces('text/event-stream'),
+        ApiValidationError(),
+        ApiNotFound('Test run not found'),
     );

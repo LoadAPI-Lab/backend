@@ -5,12 +5,13 @@ import {
     HandleWorkerEventUseCase,
     StartTestRunUseCase,
     StopTestRunUseCase,
+    WatchTestRunUseCase,
 } from './application/use-cases';
-import { TestRunStopper, WorkerOrchestrator } from './domain/ports';
+import { LiveFeed, TestRunStopper, WorkerOrchestrator } from './domain/ports';
 import { TestRunsRepository } from './domain/repositories';
 import { WorkerOrchestratorImpl } from './infrastructure/messaging';
 import { TestRunsRepositoryImpl } from './infrastructure/persistence/repository';
-import { TestRunStopperImpl } from './infrastructure/redis';
+import { LiveFeedImpl, TestRunStopperImpl } from './infrastructure/redis';
 import { WorkerEventsConsumer } from './presentation/consumers';
 import { TestRunsController } from './presentation/controllers';
 
@@ -20,11 +21,13 @@ import { TestRunsController } from './presentation/controllers';
         StartTestRunUseCase,
         GetTestRunUseCase,
         StopTestRunUseCase,
+        WatchTestRunUseCase,
         HandleWorkerEventUseCase,
         WorkerEventsConsumer,
         { provide: TestRunsRepository, useClass: TestRunsRepositoryImpl },
         { provide: WorkerOrchestrator, useClass: WorkerOrchestratorImpl },
         { provide: TestRunStopper, useClass: TestRunStopperImpl },
+        { provide: LiveFeed, useClass: LiveFeedImpl },
     ],
     exports: [TestRunsRepository],
 })
