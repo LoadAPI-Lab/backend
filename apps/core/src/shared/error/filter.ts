@@ -83,12 +83,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     ) => {
         const { request, response } = this.getCtxBase(host);
 
-        const pgError =
-            exception instanceof PostgresError
-                ? exception
-                : (exception.cause instanceof PostgresError
-                  ? exception.cause
-                  : undefined);
+        const pgError = this.findPostgresError(exception);
         const query = exception instanceof DrizzleQueryError ? exception.query : undefined;
         const params = exception instanceof DrizzleQueryError ? exception.params : undefined;
 
@@ -111,6 +106,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
             }),
         );
     };
+
+    private findPostgresError(
+        exception: DrizzleQueryError | PostgresError,
+    ): PostgresError | undefined {
+        if (exception instanceof PostgresError) {
+            return exception;
+        }
+        if (exception.cause instanceof PostgresError) {
+            return exception.cause;
+        }
+        return undefined;
+    }
 
     private readonly parseHttp = (exception: BaseException, host: ArgumentsHost) => {
         const { request, response } = this.getCtxBase(host);

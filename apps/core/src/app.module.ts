@@ -18,7 +18,7 @@ import { TestRunsModule } from './test-runs/test-runs.module';
 
 @Module({
     imports: [
-        ConfigModule,
+        ConfigModule.forRoot(),
         DatabaseModule.registerAsync({
             global: true,
             inject: [ConfigService],
