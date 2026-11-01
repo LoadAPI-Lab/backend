@@ -12,10 +12,10 @@
         "start": "nest start",
         "start:dev": "nest start --watch",
         "start:debug": "nest start --debug --watch",
-        "start:prod": "node dist/main",
+        "start:prod": "node dist/src/main.js",
         "db:generate": "drizzle-kit generate",
         "db:migrate": "drizzle-kit migrate",
-        "lint": "oxlint --type-aware src/ test/",
+        "lint": "oxlint --type-aware src/ libs/ test/",
         "test": "vitest run",
         "test:w": "vitest",
         "test:c": "vitest run --coverage",
@@ -64,5 +64,8 @@
         "tsconfig-paths": "^4.2.0",
         "typescript": "^6.0.2",
         "vitest": "5.0.5"
+    },
+    "engines": {
+        "node": ">=24"
     }
 }
