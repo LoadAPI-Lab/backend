@@ -4,8 +4,8 @@ import type { AmqpConnectionManager, ChannelWrapper } from 'amqp-connection-mana
 import type { ConfirmChannel } from 'amqplib';
 
 import type { TestJob, WorkerOrchestrator } from '../../domain/ports';
+import { QUEUE_OPTIONS, TEST_JOBS_QUEUE } from './constants';
 
-const TEST_JOBS_QUEUE = 'test_jobs';
 const PUBLISH_TIMEOUT_MS = 5000;
 
 @Injectable()
@@ -20,11 +20,7 @@ export class WorkerOrchestratorImpl implements WorkerOrchestrator {
         this.channel = connection.createChannel({
             json: true,
             setup: async (channel: ConfirmChannel) => {
-                await channel.assertQueue(TEST_JOBS_QUEUE, {
-                    durable: true,
-                    autoDelete: false,
-                    exclusive: false,
-                });
+                await channel.assertQueue(TEST_JOBS_QUEUE, QUEUE_OPTIONS);
             },
         });
 

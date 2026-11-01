@@ -1,7 +1,7 @@
-import { MAX_TARGET_RPS } from '../constants';
+import { HttpMethod, MAX_TARGET_RPS } from '../constants';
 import { singleConfigSchema } from './single-config.schema';
 
-const TARGET = { method: 'GET', url: 'https://api.example.com/users' };
+const TARGET = { method: HttpMethod.GET, url: 'https://api.example.com/users' };
 
 describe('singleConfigSchema', () => {
     const acceptedCases: { name: string; config: unknown }[] = [
@@ -27,7 +27,7 @@ describe('singleConfigSchema', () => {
         {
             name: 'invalid target',
             config: {
-                target: { method: 'GET', url: '/users' },
+                target: { method: HttpMethod.GET, url: '/users' },
                 targetRps: 100,
                 durationSeconds: 60,
             },

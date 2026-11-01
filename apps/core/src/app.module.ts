@@ -1,4 +1,4 @@
-import { ConfigModule } from '@libs/config';
+import { ConfigModule, NodeEnv } from '@libs/config';
 import { DatabaseModule } from '@libs/database';
 import { RabbitMqModule } from '@libs/rabbitmq';
 import { Module } from '@nestjs/common';
@@ -19,7 +19,7 @@ import { TestRunsModule } from './test-runs/test-runs.module';
             inject: [ConfigService],
             useFactory: (cfg: ConfigService) => ({
                 schema,
-                logging: cfg.get('NODE_ENV') !== 'production',
+                logging: cfg.get('NODE_ENV') !== NodeEnv.PRODUCTION,
             }),
         }),
         RabbitMqModule,

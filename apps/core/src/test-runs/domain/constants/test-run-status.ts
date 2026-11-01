@@ -1,5 +1,23 @@
-export const TEST_RUN_STATUSES = ['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'STOPPED'] as const;
-export type TestRunStatus = (typeof TEST_RUN_STATUSES)[number];
+export const TestRunStatus = {
+    PENDING: 'PENDING',
+    RUNNING: 'RUNNING',
+    COMPLETED: 'COMPLETED',
+    FAILED: 'FAILED',
+    STOPPED: 'STOPPED',
+} as const;
+export type TestRunStatus = (typeof TestRunStatus)[keyof typeof TestRunStatus];
 
-export const FINAL_STATUSES = ['COMPLETED', 'FAILED', 'STOPPED'] as const;
+export const TEST_RUN_STATUSES = [
+    TestRunStatus.PENDING,
+    TestRunStatus.RUNNING,
+    TestRunStatus.COMPLETED,
+    TestRunStatus.FAILED,
+    TestRunStatus.STOPPED,
+] as const;
+
+export const FINAL_STATUSES = [
+    TestRunStatus.COMPLETED,
+    TestRunStatus.FAILED,
+    TestRunStatus.STOPPED,
+] as const;
 export type FinalStatus = (typeof FINAL_STATUSES)[number];

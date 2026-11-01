@@ -1,9 +1,9 @@
-import { TEST_RUN_STATUSES, type TestRunStatus } from './constants';
+import { HttpMethod, TEST_RUN_STATUSES, TestRunStatus, TestType } from './constants';
 import type { SingleConfig } from './schemas';
 import { TestRun } from './test-run';
 
 const SINGLE_CONFIG: SingleConfig = {
-    target: { method: 'GET', url: 'https://api.example.com/users' },
+    target: { method: HttpMethod.GET, url: 'https://api.example.com/users' },
     targetRps: 10,
     durationSeconds: 10,
 };
@@ -13,7 +13,7 @@ const STARTED_AT = new Date('2026-01-01T00:01:00.000Z');
 const FINISHED_AT = new Date('2026-01-01T00:02:00.000Z');
 
 function startedAtFor(status: TestRunStatus): Date | undefined {
-    if (status === 'PENDING') {
+    if (status === TestRunStatus.PENDING) {
         return undefined;
     }
     return STARTED_AT;
@@ -30,7 +30,7 @@ function restoreWith(
 ): TestRun {
     return TestRun.restore({
         id: 'fixed-id',
-        type: 'single',
+        type: TestType.SINGLE,
         status,
         config: SINGLE_CONFIG,
         createdAt: CREATED_AT,
@@ -39,11 +39,14 @@ function restoreWith(
     });
 }
 
-type FinishTarget = 'COMPLETED' | 'FAILED' | 'STOPPED';
+type FinishTarget =
+    | typeof TestRunStatus.COMPLETED
+    | typeof TestRunStatus.FAILED
+    | typeof TestRunStatus.STOPPED;
 
 function finishInputFor(target: FinishTarget) {
-    if (target === 'FAILED') {
-        return { status: 'FAILED' as const, reason: 'worker crashed', finishedAt: FINISHED_AT };
+    if (target === TestRunStatus.FAILED) {
+        return { status: TestRunStatus.FAILED, reason: 'worker crashed', finishedAt: FINISHED_AT };
     }
     return { status: target, result: { ok: true }, finishedAt: FINISHED_AT };
 }
@@ -52,10 +55,10 @@ describe('TestRun', () => {
     describe('create', () => {
         it('starts PENDING with the given config and createdAt', () => {
             const now = new Date('2026-02-01T10:00:00.000Z');
-            const run = TestRun.create({ type: 'scenario', config: { steps: [] }, now });
+            const run = TestRun.create({ type: TestType.SCENARIO, config: { steps: [] }, now });
 
-            expect(run.status).toBe('PENDING');
-            expect(run.type).toBe('scenario');
+            expect(run.status).toBe(TestRunStatus.PENDING);
+            expect(run.type).toBe(TestType.SCENARIO);
             expect(run.config).toEqual({ steps: [] });
             expect(run.createdAt).toBe(now);
             expect(run.startedAt).toBeUndefined();
@@ -67,7 +70,7 @@ describe('TestRun', () => {
 
         it('defaults createdAt to now when not given', () => {
             const before = Date.now();
-            const run = TestRun.create({ type: 'single', config: SINGLE_CONFIG });
+            const run = TestRun.create({ type: TestType.SINGLE, config: SINGLE_CONFIG });
             const after = Date.now();
 
             expect(run.createdAt.getTime()).toBeGreaterThanOrEqual(before);
@@ -82,9 +85,9 @@ describe('TestRun', () => {
 
             const result = run.markStarted(STARTED_AT);
 
-            if (status === 'PENDING') {
+            if (status === TestRunStatus.PENDING) {
                 expect(result).toBe(true);
-                expect(run.status).toBe('RUNNING');
+                expect(run.status).toBe(TestRunStatus.RUNNING);
                 expect(run.startedAt).toBe(STARTED_AT);
             } else {
                 expect(result).toBe(false);
@@ -94,18 +97,22 @@ describe('TestRun', () => {
         });
 
         it('is idempotent once RUNNING', () => {
-            const run = restoreWith('PENDING');
+            const run = restoreWith(TestRunStatus.PENDING);
             const second = new Date('2026-01-01T00:05:00.000Z');
 
             expect(run.markStarted(STARTED_AT)).toBe(true);
             expect(run.markStarted(second)).toBe(false);
-            expect(run.status).toBe('RUNNING');
+            expect(run.status).toBe(TestRunStatus.RUNNING);
             expect(run.startedAt).toBe(STARTED_AT);
         });
     });
 
     describe('finish', () => {
-        const targets: readonly FinishTarget[] = ['COMPLETED', 'STOPPED', 'FAILED'];
+        const targets: readonly FinishTarget[] = [
+            TestRunStatus.COMPLETED,
+            TestRunStatus.STOPPED,
+            TestRunStatus.FAILED,
+        ];
 
         for (const target of targets) {
             it.each(TEST_RUN_STATUSES)(`from %s to ${target}`, (status) => {
@@ -113,13 +120,14 @@ describe('TestRun', () => {
                 const input = finishInputFor(target);
 
                 const result = run.finish(input);
-                const allowed = status === 'PENDING' || status === 'RUNNING';
+                const allowed =
+                    status === TestRunStatus.PENDING || status === TestRunStatus.RUNNING;
 
                 if (allowed) {
                     expect(result).toBe(true);
                     expect(run.status).toBe(target);
                     expect(run.finishedAt).toBe(FINISHED_AT);
-                    if (target === 'FAILED') {
+                    if (target === TestRunStatus.FAILED) {
                         expect(run.reason).toBe('worker crashed');
                         expect(run.result).toBeUndefined();
                     } else {
@@ -135,10 +143,10 @@ describe('TestRun', () => {
         }
 
         it('fills startedAt when it was not set yet', () => {
-            const run = restoreWith('PENDING');
+            const run = restoreWith(TestRunStatus.PENDING);
 
             const result = run.finish({
-                status: 'COMPLETED',
+                status: TestRunStatus.COMPLETED,
                 result: {},
                 finishedAt: FINISHED_AT,
                 startedAt: STARTED_AT,
@@ -149,19 +157,19 @@ describe('TestRun', () => {
         });
 
         it('leaves startedAt unset when finish is called without one and none was set', () => {
-            const run = restoreWith('PENDING');
+            const run = restoreWith(TestRunStatus.PENDING);
 
-            run.finish({ status: 'COMPLETED', result: {}, finishedAt: FINISHED_AT });
+            run.finish({ status: TestRunStatus.COMPLETED, result: {}, finishedAt: FINISHED_AT });
 
             expect(run.startedAt).toBeUndefined();
         });
 
         it('never overwrites an already-set startedAt', () => {
-            const run = restoreWith('RUNNING');
+            const run = restoreWith(TestRunStatus.RUNNING);
             const otherStartedAt = new Date('2026-01-01T00:09:00.000Z');
 
             run.finish({
-                status: 'COMPLETED',
+                status: TestRunStatus.COMPLETED,
                 result: {},
                 finishedAt: FINISHED_AT,
                 startedAt: otherStartedAt,
@@ -171,24 +179,24 @@ describe('TestRun', () => {
         });
 
         it.each(['', '   '])('throws for FAILED with reason %j', (reason) => {
-            const run = restoreWith('RUNNING');
+            const run = restoreWith(TestRunStatus.RUNNING);
 
             expect(() =>
-                run.finish({ status: 'FAILED', reason, finishedAt: FINISHED_AT }),
+                run.finish({ status: TestRunStatus.FAILED, reason, finishedAt: FINISHED_AT }),
             ).toThrow();
         });
 
         it('never overwrites a final status', () => {
-            const run = restoreWith('COMPLETED', { result: { first: true } });
+            const run = restoreWith(TestRunStatus.COMPLETED, { result: { first: true } });
 
             const result = run.finish({
-                status: 'STOPPED',
+                status: TestRunStatus.STOPPED,
                 result: { second: true },
                 finishedAt: FINISHED_AT,
             });
 
             expect(result).toBe(false);
-            expect(run.status).toBe('COMPLETED');
+            expect(run.status).toBe(TestRunStatus.COMPLETED);
             expect(run.result).toEqual({ first: true });
         });
     });
@@ -197,7 +205,7 @@ describe('TestRun', () => {
         const maxRunningMs = 60_000;
 
         it.each(TEST_RUN_STATUSES)('is false for %s when not RUNNING', (status) => {
-            if (status === 'RUNNING') {
+            if (status === TestRunStatus.RUNNING) {
                 return;
             }
             const run = restoreWith(status);
@@ -207,14 +215,14 @@ describe('TestRun', () => {
         });
 
         it('is false exactly at the boundary', () => {
-            const run = restoreWith('RUNNING');
+            const run = restoreWith(TestRunStatus.RUNNING);
             const now = new Date(STARTED_AT.getTime() + maxRunningMs);
 
             expect(run.isStuck(now, maxRunningMs)).toBe(false);
         });
 
         it('is true just past the boundary', () => {
-            const run = restoreWith('RUNNING');
+            const run = restoreWith(TestRunStatus.RUNNING);
             const now = new Date(STARTED_AT.getTime() + maxRunningMs + 1);
 
             expect(run.isStuck(now, maxRunningMs)).toBe(true);
@@ -225,7 +233,7 @@ describe('TestRun', () => {
         const maxPendingMs = 30_000;
 
         it.each(TEST_RUN_STATUSES)('is false for %s when not PENDING', (status) => {
-            if (status === 'PENDING') {
+            if (status === TestRunStatus.PENDING) {
                 return;
             }
             const run = restoreWith(status);
@@ -235,14 +243,14 @@ describe('TestRun', () => {
         });
 
         it('is false exactly at the boundary', () => {
-            const run = restoreWith('PENDING');
+            const run = restoreWith(TestRunStatus.PENDING);
             const now = new Date(CREATED_AT.getTime() + maxPendingMs);
 
             expect(run.isPendingTooLong(now, maxPendingMs)).toBe(false);
         });
 
         it('is true just past the boundary', () => {
-            const run = restoreWith('PENDING');
+            const run = restoreWith(TestRunStatus.PENDING);
             const now = new Date(CREATED_AT.getTime() + maxPendingMs + 1);
 
             expect(run.isPendingTooLong(now, maxPendingMs)).toBe(true);

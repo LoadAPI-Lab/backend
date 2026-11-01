@@ -1,13 +1,13 @@
-import { MAX_SCENARIO_STEPS } from '../constants';
+import { HttpMethod, MAX_SCENARIO_STEPS } from '../constants';
 import { scenarioConfigSchema } from './scenario-config.schema';
 
 const login = {
-    target: { method: 'POST', url: 'https://api.example.com/login' },
+    target: { method: HttpMethod.POST, url: 'https://api.example.com/login' },
     extract: [{ name: 'token', path: 'accessToken' }],
 };
 const createTask = {
     target: {
-        method: 'POST',
+        method: HttpMethod.POST,
         url: 'https://api.example.com/tasks',
         headers: { Authorization: 'Bearer {{token}}' },
         body: '{"title":"task-{{$uuid}}"}',
@@ -15,7 +15,7 @@ const createTask = {
     extract: [{ name: 'taskId', path: 'data.id' }],
 };
 const getTask = {
-    target: { method: 'GET', url: 'https://api.example.com/tasks/{{taskId}}' },
+    target: { method: HttpMethod.GET, url: 'https://api.example.com/tasks/{{taskId}}' },
 };
 
 describe('scenarioConfigSchema', () => {
@@ -26,7 +26,7 @@ describe('scenarioConfigSchema', () => {
         {
             name: 'exactly the step limit',
             steps: Array.from({ length: MAX_SCENARIO_STEPS }, () => ({
-                target: { method: 'GET', url: 'https://api.example.com/health' },
+                target: { method: HttpMethod.GET, url: 'https://api.example.com/health' },
             })),
         },
     ];
@@ -39,7 +39,10 @@ describe('scenarioConfigSchema', () => {
             name: 'step uses its own extracted variable',
             steps: [
                 {
-                    target: { method: 'GET', url: 'https://api.example.com/tasks/{{taskId}}' },
+                    target: {
+                        method: HttpMethod.GET,
+                        url: 'https://api.example.com/tasks/{{taskId}}',
+                    },
                     extract: [{ name: 'taskId', path: 'id' }],
                 },
             ],
@@ -48,7 +51,7 @@ describe('scenarioConfigSchema', () => {
             name: 'extract rule without path',
             steps: [
                 {
-                    target: { method: 'GET', url: 'https://api.example.com/me' },
+                    target: { method: HttpMethod.GET, url: 'https://api.example.com/me' },
                     extract: [{ name: 'userId', path: '' }],
                 },
             ],
@@ -57,19 +60,22 @@ describe('scenarioConfigSchema', () => {
             name: 'extract name with a dash',
             steps: [
                 {
-                    target: { method: 'GET', url: 'https://api.example.com/me' },
+                    target: { method: HttpMethod.GET, url: 'https://api.example.com/me' },
                     extract: [{ name: 'user-id', path: 'id' }],
                 },
             ],
         },
         {
             name: 'invalid target in step',
-            steps: [login, { target: { method: 'GET', url: 'https://api.example.com/users/:id' } }],
+            steps: [
+                login,
+                { target: { method: HttpMethod.GET, url: 'https://api.example.com/users/:id' } },
+            ],
         },
         {
             name: 'too many steps',
             steps: Array.from({ length: MAX_SCENARIO_STEPS + 1 }, () => ({
-                target: { method: 'GET', url: 'https://api.example.com/health' },
+                target: { method: HttpMethod.GET, url: 'https://api.example.com/health' },
             })),
         },
     ];

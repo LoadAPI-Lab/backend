@@ -1,3 +1,4 @@
+import { NodeEnv } from '@libs/config';
 import {
     CallHandler,
     ExecutionContext,
@@ -8,7 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { SKIP_CONTRACT } from '@shared/decorators';
-import { BaseException } from '@shared/error';
+import { BaseException, ErrorCode } from '@shared/error';
 import { map, Observable } from 'rxjs';
 import { z } from 'zod/v4';
 
@@ -22,7 +23,7 @@ export class ZodValidationInterceptor implements NestInterceptor<unknown, unknow
         private readonly reflector: Reflector,
         private readonly configService: ConfigService,
     ) {
-        this.isDev = this.configService.get('NODE_ENV') === 'development';
+        this.isDev = this.configService.get('NODE_ENV') === NodeEnv.DEVELOPMENT;
     }
 
     intercept(context: ExecutionContext, next: CallHandler<unknown>): Observable<unknown> {
@@ -48,7 +49,7 @@ export class ZodValidationInterceptor implements NestInterceptor<unknown, unknow
                 if (!schema) {
                     throw new BaseException(
                         {
-                            code: 'MISSING_VALIDATION_SCHEMA',
+                            code: ErrorCode.MISSING_VALIDATION_SCHEMA,
                             message: 'No response schema was declared for this endpoint',
                         },
                         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -69,7 +70,7 @@ export class ZodValidationInterceptor implements NestInterceptor<unknown, unknow
 
                     throw new BaseException(
                         {
-                            code: 'RESPONSE_VALIDATION_FAILED',
+                            code: ErrorCode.RESPONSE_VALIDATION_FAILED,
                             message: 'The response data does not match the expected format',
                             details,
                         },

@@ -1,6 +1,8 @@
 import { jwtSecretValidation } from '@libs/config/helpers/jwt-secren-validation';
 import { z } from 'zod/v4';
 
+import { NodeEnv } from './constants';
+
 const duration = z.string().regex(/^[0-9]+[smhdw]$/, {
     message: 'Use a number with a suffix s, m, h, d or w, for example 15m or 30d',
 });
@@ -11,7 +13,7 @@ const jwtSecret = (name: string) =>
     });
 
 export const ConfigSchema = z.object({
-    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    NODE_ENV: z.enum(NodeEnv).default(NodeEnv.DEVELOPMENT),
     PORT: z.coerce.number().int().positive().default(3000),
 
     API_PUBLIC_URL: z.url().optional(),

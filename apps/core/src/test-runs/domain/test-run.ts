@@ -1,4 +1,4 @@
-import { FINAL_STATUSES, type TestRunStatus, type TestType } from './constants';
+import { FINAL_STATUSES, TestRunStatus, type TestType } from './constants';
 import type { ScenarioConfig, SingleConfig, TestConfigInput } from './schemas';
 
 export type TestRunConfig = SingleConfig | ScenarioConfig;
@@ -16,8 +16,13 @@ interface TestRunState {
 }
 
 type FinishInput =
-    | { status: 'COMPLETED' | 'STOPPED'; result: unknown; finishedAt: Date; startedAt?: Date }
-    | { status: 'FAILED'; reason: string; finishedAt: Date; startedAt?: Date };
+    | {
+          status: typeof TestRunStatus.COMPLETED | typeof TestRunStatus.STOPPED;
+          result: unknown;
+          finishedAt: Date;
+          startedAt?: Date;
+      }
+    | { status: typeof TestRunStatus.FAILED; reason: string; finishedAt: Date; startedAt?: Date };
 
 const isFinalStatus = (status: TestRunStatus): boolean =>
     (FINAL_STATUSES as readonly string[]).includes(status);
@@ -31,7 +36,7 @@ export class TestRun {
             type: input.type,
             config: input.config,
             createdAt: input.now ?? new Date(),
-            status: 'PENDING',
+            status: TestRunStatus.PENDING,
         });
     }
 
@@ -86,11 +91,11 @@ export class TestRun {
     }
 
     markStarted(at: Date): boolean {
-        if (this.state.status !== 'PENDING') {
+        if (this.state.status !== TestRunStatus.PENDING) {
             return false;
         }
 
-        this.state.status = 'RUNNING';
+        this.state.status = TestRunStatus.RUNNING;
         this.state.startedAt = at;
         return true;
     }
@@ -100,7 +105,7 @@ export class TestRun {
             return false;
         }
 
-        if (input.status === 'FAILED' && input.reason.trim() === '') {
+        if (input.status === TestRunStatus.FAILED && input.reason.trim() === '') {
             throw new Error('A FAILED test run requires a non-empty reason');
         }
 
@@ -108,7 +113,7 @@ export class TestRun {
         this.state.finishedAt = input.finishedAt;
         this.state.startedAt ??= input.startedAt;
 
-        if (input.status === 'FAILED') {
+        if (input.status === TestRunStatus.FAILED) {
             this.state.reason = input.reason;
         } else {
             this.state.result = input.result;
@@ -118,7 +123,7 @@ export class TestRun {
     }
 
     isStuck(now: Date, maxRunningMs: number): boolean {
-        if (this.state.status !== 'RUNNING' || this.state.startedAt === undefined) {
+        if (this.state.status !== TestRunStatus.RUNNING || this.state.startedAt === undefined) {
             return false;
         }
 
@@ -126,7 +131,7 @@ export class TestRun {
     }
 
     isPendingTooLong(now: Date, maxPendingMs: number): boolean {
-        if (this.state.status !== 'PENDING') {
+        if (this.state.status !== TestRunStatus.PENDING) {
             return false;
         }
 

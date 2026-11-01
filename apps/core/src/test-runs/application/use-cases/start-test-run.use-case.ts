@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { BaseException } from '@shared/error';
 
+import { TestRunStatus } from '../../domain/constants';
 import { TestRunErrorCodes, TestRunErrorMessages } from '../../domain/errors';
 import { WorkerOrchestrator } from '../../domain/ports';
 import { TestRunsRepository } from '../../domain/repositories';
@@ -25,11 +26,11 @@ export class StartTestRunUseCase {
             await this.orchestrator.enqueue({ testId: run.id, ...input });
         } catch (error) {
             run.finish({
-                status: 'FAILED',
+                status: TestRunStatus.FAILED,
                 reason: ENQUEUE_FAILED_REASON,
                 finishedAt: new Date(),
             });
-            await this.repository.updateIfStatus(run, 'PENDING');
+            await this.repository.updateIfStatus(run, TestRunStatus.PENDING);
 
             throw new BaseException(
                 {

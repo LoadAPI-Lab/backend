@@ -1,3 +1,4 @@
+import { NodeEnv } from '@libs/config';
 import {
     type ArgumentsHost,
     Catch,
@@ -13,6 +14,7 @@ import { ZodValidationException } from 'nestjs-zod';
 import { PostgresError } from 'postgres';
 import type { ZodError } from 'zod/v4';
 
+import { ErrorCode } from './codes';
 import { DATABASE_ERRORS } from './database-errors';
 import { BaseException, type IErrorOptions } from './exception';
 import type { ErrorDetail } from './schema';
@@ -26,7 +28,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     private readonly isDev: boolean;
 
     constructor(private readonly configService: ConfigService) {
-        this.isDev = this.configService.get('NODE_ENV') === 'development';
+        this.isDev = this.configService.get('NODE_ENV') === NodeEnv.DEVELOPMENT;
     }
 
     catch(exception: unknown, host: ArgumentsHost) {
@@ -67,7 +69,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
         return response.status(status).send(
             this.formatErrorResponse(request, status, {
-                code: 'VALIDATION_FAILED',
+                code: ErrorCode.VALIDATION_FAILED,
                 message: 'The request data failed validation',
                 details,
                 stack: exception.stack,
@@ -102,7 +104,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
         return response.status(status).send(
             this.formatErrorResponse(request, status, {
-                code: 'DATABASE_ERROR',
+                code: ErrorCode.DATABASE_ERROR,
                 message,
                 details: [],
                 stack: undefined,
@@ -146,7 +148,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
             typeof res === 'object' && res !== null && 'error' in res && res.error
                 ? String(res.error)
                 : null;
-        const code = errorCode ? errorCode.toUpperCase().replace(/\s+/g, '_') : 'HTTP_EXCEPTION';
+        const code = errorCode
+            ? errorCode.toUpperCase().replace(/\s+/g, '_')
+            : ErrorCode.HTTP_EXCEPTION;
 
         this.log(host, status, {
             message: `HTTP exception on ${request.method} ${this.pathOf(request)}: ${code}`,
@@ -177,7 +181,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
         return response.status(status).send(
             this.formatErrorResponse(request, status, {
-                code: 'INTERNAL_SERVER_ERROR',
+                code: ErrorCode.INTERNAL_SERVER_ERROR,
                 message: 'An unexpected error occurred on the server',
                 details: [],
                 stack,
