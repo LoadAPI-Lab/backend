@@ -1,0 +1,10 @@
+services:
+  core:
+    build:
+      target: dev
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ../apps/core/src:/app/src
+      - ../apps/core/libs:/app/libs
+      - ../apps/core/migrations:/app/migrations
