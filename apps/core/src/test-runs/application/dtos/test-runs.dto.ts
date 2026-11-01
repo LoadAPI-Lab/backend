@@ -7,6 +7,12 @@ import { testConfigSchema, type TestConfigInput } from '../../domain/schemas';
 const testRunIdSchema = z.uuid().describe('Test run id');
 const testRunStatusSchema = z.enum(TEST_RUN_STATUSES).describe('Test run status');
 
+const testRunParamsSchema = z.object({
+    id: testRunIdSchema,
+});
+
+export class TestRunParamsDto extends createZodDto(testRunParamsSchema) {}
+
 export const StartTestRunDto = Object.defineProperty(createZodDto(testConfigSchema), 'name', {
     value: 'StartTestRunDto',
 });
@@ -33,3 +39,14 @@ const testRunResponseSchema = z.object({
 });
 
 export class TestRunResponseDto extends createZodDto(testRunResponseSchema) {}
+
+export type TestRunResponse = z.infer<typeof testRunResponseSchema>;
+
+const stopTestRunResponseSchema = z.object({
+    id: testRunIdSchema,
+    status: testRunStatusSchema,
+});
+
+export class StopTestRunResponseDto extends createZodDto(stopTestRunResponseSchema) {}
+
+export type StopTestRunResponse = z.infer<typeof stopTestRunResponseSchema>;

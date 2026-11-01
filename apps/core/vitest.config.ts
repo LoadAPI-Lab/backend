@@ -12,6 +12,7 @@ export default defineConfig({
         alias: {
             '@core': path.resolve(__dirname, './src'),
             '@libs/rabbitmq': path.resolve(__dirname, './libs/rabbitmq/src'),
+            '@libs/redis': path.resolve(__dirname, './libs/redis/src'),
             '@shared': path.resolve(__dirname, './src/shared'),
         },
         environment: 'node',

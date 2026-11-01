@@ -122,6 +122,10 @@ export class TestRun {
         return true;
     }
 
+    isFinal(): boolean {
+        return isFinalStatus(this.state.status);
+    }
+
     isStuck(now: Date, maxRunningMs: number): boolean {
         if (this.state.status !== TestRunStatus.RUNNING || this.state.startedAt === undefined) {
             return false;

@@ -1,233 +1,254 @@
-diff --git a/apps/core/libs/bootstrap/src/bootstrap.ts b/apps/core/libs/bootstrap/src/bootstrap.ts
-index 97d8ef6..4d9dabd 100644
---- a/apps/core/libs/bootstrap/src/bootstrap.ts
-+++ b/apps/core/libs/bootstrap/src/bootstrap.ts
-@@ -1,5 +1,6 @@
- import fastifyCompress from '@fastify/compress';
- import fastifyCookie from '@fastify/cookie';
-+import { NodeEnv } from '@libs/config';
- import { Logger, VersioningType } from '@nestjs/common';
- import { ConfigService } from '@nestjs/config';
- import { NestFactory } from '@nestjs/core';
-@@ -19,14 +20,13 @@ export async function bootstrapApp(options: BootstrapOptions) {
- 
-     const app = await NestFactory.create<NestFastifyApplication>(withThrottler(appModule), adapter);
-     const cfg = app.get(ConfigService);
--    const isProduction = cfg.get('NODE_ENV') === 'production';
-+    const isProduction = cfg.get('NODE_ENV') === NodeEnv.PRODUCTION;
-     const port = cfg.get('PORT');
- 
-     app.enableShutdownHooks();
-     setupLogger(app, 'core', isProduction);
-     addFastifyHooks(app);
- 
--    // TODO: exclude SSE route from compression
-     await app.register(fastifyCompress, { global: true, threshold: 1024 });
-     await app.register(fastifyCookie, {
-         secret: cfg.get('COOKIE_SECRET'),
-diff --git a/apps/core/libs/bootstrap/tsconfig.lib.json b/apps/core/libs/bootstrap/tsconfig.lib.json
-deleted file mode 100644
-index 909ede0..0000000
---- a/apps/core/libs/bootstrap/tsconfig.lib.json
-+++ /dev/null
-@@ -1,9 +0,0 @@
--{
--    "extends": "../../tsconfig.json",
--    "compilerOptions": {
--        "declaration": true,
--        "outDir": "../../dist/libs/bootstrap"
--    },
--    "include": ["src/**/*"],
--    "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
--}
-diff --git a/apps/core/libs/config/src/config.schema.ts b/apps/core/libs/config/src/config.schema.ts
-index 6d474f8..da05da2 100644
---- a/apps/core/libs/config/src/config.schema.ts
-+++ b/apps/core/libs/config/src/config.schema.ts
-@@ -1,6 +1,8 @@
- import { jwtSecretValidation } from '@libs/config/helpers/jwt-secren-validation';
- import { z } from 'zod/v4';
- 
-+import { NodeEnv } from './constants';
-+
- const duration = z.string().regex(/^[0-9]+[smhdw]$/, {
-     message: 'Use a number with a suffix s, m, h, d or w, for example 15m or 30d',
- });
-@@ -11,7 +13,7 @@ const jwtSecret = (name: string) =>
-     });
- 
- export const ConfigSchema = z.object({
--    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-+    NODE_ENV: z.enum(NodeEnv).default(NodeEnv.DEVELOPMENT),
-     PORT: z.coerce.number().int().positive().default(3000),
- 
-     API_PUBLIC_URL: z.url().optional(),
-diff --git a/apps/core/libs/config/src/constants.ts b/apps/core/libs/config/src/constants.ts
+diff --git a/apps/core/libs/redis/src/constants.ts b/apps/core/libs/redis/src/constants.ts
 new file mode 100644
-index 0000000..f178d7e
+index 0000000..22edecc
 --- /dev/null
-+++ b/apps/core/libs/config/src/constants.ts
-@@ -0,0 +1,6 @@
-+export const NodeEnv = {
-+    DEVELOPMENT: 'development',
-+    PRODUCTION: 'production',
-+    TEST: 'test',
-+} as const;
-+export type NodeEnv = (typeof NodeEnv)[keyof typeof NodeEnv];
-diff --git a/apps/core/libs/config/src/index.ts b/apps/core/libs/config/src/index.ts
-index 0c71077..5b78d97 100644
---- a/apps/core/libs/config/src/index.ts
-+++ b/apps/core/libs/config/src/index.ts
-@@ -1,2 +1,3 @@
- export * from './config.module';
- export * from './config.schema';
-+export * from './constants';
-diff --git a/apps/core/libs/config/tsconfig.lib.json b/apps/core/libs/config/tsconfig.lib.json
-deleted file mode 100644
-index 855908d..0000000
---- a/apps/core/libs/config/tsconfig.lib.json
-+++ /dev/null
-@@ -1,9 +0,0 @@
--{
--    "extends": "../../tsconfig.json",
--    "compilerOptions": {
--        "declaration": true,
--        "outDir": "../../dist/libs/config"
--    },
--    "include": ["src/**/*"],
--    "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
--}
-diff --git a/apps/core/libs/database/src/database.module.ts b/apps/core/libs/database/src/database.module.ts
-index 7f7afc0..cb8b2ad 100644
---- a/apps/core/libs/database/src/database.module.ts
-+++ b/apps/core/libs/database/src/database.module.ts
-@@ -32,9 +32,8 @@ import { MigrationService } from './migration.service';
-                     onnotice: (msg) => new Logger('PostgresJS').verbose(msg),
-                     backoff: (attempt) => Math.min(attempt * 100, 3000),
-                     target_session_attrs: 'read-write',
--                    publications: 'alltables',
-                     connect_timeout: 2,
--                    idle_timeout: 5,
-+                    idle_timeout: 30,
-                     max_lifetime: 60 * 60,
-                     keep_alive: 30,
-                     transform: {
-diff --git a/apps/core/libs/database/tsconfig.lib.json b/apps/core/libs/database/tsconfig.lib.json
-deleted file mode 100644
-index 0add6d4..0000000
---- a/apps/core/libs/database/tsconfig.lib.json
-+++ /dev/null
-@@ -1,9 +0,0 @@
--{
--    "extends": "../../tsconfig.json",
--    "compilerOptions": {
--        "declaration": true,
--        "outDir": "../../dist/libs/database"
--    },
--    "include": ["src/**/*"],
--    "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
--}
++++ b/apps/core/libs/redis/src/constants.ts
+@@ -0,0 +1,2 @@
++export const REDIS_CLIENT = 'REDIS_CLIENT';
++export const REDIS_SUBSCRIBER = 'REDIS_SUBSCRIBER';
+diff --git a/apps/core/libs/redis/src/index.ts b/apps/core/libs/redis/src/index.ts
+new file mode 100644
+index 0000000..82a4456
+--- /dev/null
++++ b/apps/core/libs/redis/src/index.ts
+@@ -0,0 +1,2 @@
++export { REDIS_CLIENT, REDIS_SUBSCRIBER } from './constants';
++export * from './redis.module';
+diff --git a/apps/core/libs/redis/src/redis.module.ts b/apps/core/libs/redis/src/redis.module.ts
+new file mode 100644
+index 0000000..fbf3b40
+--- /dev/null
++++ b/apps/core/libs/redis/src/redis.module.ts
+@@ -0,0 +1,51 @@
++import { Global, Inject, Logger, Module, OnApplicationShutdown } from '@nestjs/common';
++import { ConfigService } from '@nestjs/config';
++import { Redis } from 'ioredis';
++
++import { REDIS_CLIENT, REDIS_SUBSCRIBER } from './constants';
++
++const createConnection = (configService: ConfigService, name: string): Redis => {
++    const logger = new Logger(name);
++    const connection = new Redis(configService.getOrThrow('REDIS_URL'));
++
++    connection.on('connect', () => logger.log('Connected to Redis'));
++    connection.on('error', (error: Error) =>
++        logger.error(`Redis connection error: ${error.message}`),
++    );
++
++    return connection;
++};
++
++@Global()
++@Module({
++    exports: [REDIS_CLIENT, REDIS_SUBSCRIBER],
++    providers: [
++        {
++            provide: REDIS_CLIENT,
++            inject: [ConfigService],
++            useFactory: (configService: ConfigService) =>
++                createConnection(configService, 'RedisClient'),
++        },
++        {
++            provide: REDIS_SUBSCRIBER,
++            inject: [ConfigService],
++            useFactory: (configService: ConfigService) =>
++                createConnection(configService, 'RedisSubscriber'),
++        },
++    ],
++})
++export class RedisModule implements OnApplicationShutdown {
++    private readonly logger = new Logger(RedisModule.name);
++
++    constructor(
++        @Inject(REDIS_CLIENT)
++        private readonly client: Redis,
++        @Inject(REDIS_SUBSCRIBER)
++        private readonly subscriber: Redis,
++    ) {}
++
++    async onApplicationShutdown() {
++        this.logger.log('Closing Redis connections...');
++        await Promise.allSettled([this.client.quit(), this.subscriber.quit()]);
++    }
++}
+diff --git a/apps/core/package.json b/apps/core/package.json
+index 73c4beb..e2c21fb 100644
+--- a/apps/core/package.json
++++ b/apps/core/package.json
+@@ -38,6 +38,7 @@
+         "amqplib": "^2.2.0",
+         "drizzle-orm": "^0.45.4",
+         "fastify": "^5.12.7",
++        "ioredis": "^6.0.0",
+         "nest-winston": "^2.0.0",
+         "nestjs-zod": "^5.5.0",
+         "postgres": "^3.4.9",
+diff --git a/apps/core/pnpm-lock.yaml b/apps/core/pnpm-lock.yaml
+index 860c78e..356a928 100644
+--- a/apps/core/pnpm-lock.yaml
++++ b/apps/core/pnpm-lock.yaml
+@@ -53,6 +53,9 @@ importers:
+       fastify:
+         specifier: ^5.12.7
+         version: 5.12.7
++      ioredis:
++        specifier: ^6.0.0
++        version: 6.0.0(supports-color@8.1.1)
+       nest-winston:
+         specifier: ^2.0.0
+         version: 2.0.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(winston@3.19.0)
+@@ -800,6 +803,9 @@ packages:
+       '@types/node':
+         optional: true
+ 
++  '@ioredis/commands@2.0.0':
++    resolution: {integrity: sha512-vrx0AE/T0h7cRZwfo1M39Cr+ZhZrkf0V8mQN75wucKCxCLD9l/VX6no3gFvrLqD1IlG/1LtzWovqEw3t0Vr9zg==}
++
+   '@jridgewell/gen-mapping@0.3.13':
+     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
+ 
+@@ -1693,6 +1699,10 @@ packages:
+     resolution: {integrity: sha512-ouuZd4/dm2Sw5Gmqy6bGyNNNe1qt9RpmxveLSO7KcgsTnU7RXfsw+/bukWGo1abgBiMAic068rclZsO4IWmmxQ==}
+     engines: {node: '>= 12'}
+ 
++  cluster-key-slot@1.1.1:
++    resolution: {integrity: sha512-rwHwUfXL40Chm1r08yrhU3qpUvdVlgkKNeyeGPOxnW8/SyVDvgRaed/Uz54AqWNaTCAThlj6QAs3TZcKI0xDEw==}
++    engines: {node: '>=0.10.0'}
++
+   color-convert@2.0.1:
+     resolution: {integrity: sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==}
+     engines: {node: '>=7.0.0'}
+@@ -1789,6 +1799,10 @@ packages:
+     resolution: {integrity: sha512-ZySD7Nf91aLB0RxL4KGrKHBXl7Eds1DAmEdcoVawXnLD7SDhpNgtuII2aAkg7a7QS41jxPSZ17p4VdGnMHk3MQ==}
+     engines: {node: '>=0.4.0'}
+ 
++  denque@2.1.0:
++    resolution: {integrity: sha512-HVQE3AAb/pxF8fQAoiqpvg9i3evqug3hoiwakOyZAwJm+6vZehbkYXZ0l4JxS+I3QxM97v5aaRNhj8v5oBhekw==}
++    engines: {node: '>=0.10'}
++
+   depd@2.0.0:
+     resolution: {integrity: sha512-g7nH6P6dyDioJogAAGprGpCtVImJhpPk/roCzdb3fIh61/s/nPsfR6onyMwkCAR/OlC3yBC0lESvUoQEAssIrw==}
+     engines: {node: '>= 0.8'}
+@@ -2164,6 +2178,10 @@ packages:
+   inherits@2.0.4:
+     resolution: {integrity: sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==}
+ 
++  ioredis@6.0.0:
++    resolution: {integrity: sha512-f+Dtubxfpf6KYFq7WVXJoOLn0bk4TJrMrN9SzeE+jrWrCWj7XX3fA6vkryafhADX+GMymRxgDJDOI33COkJc0w==}
++    engines: {node: '>=20.0.0'}
++
+   ipaddr.js@1.9.1:
+     resolution: {integrity: sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g==}
+     engines: {node: '>= 0.10'}
+@@ -2632,6 +2650,10 @@ packages:
+   real-require@1.0.0:
+     resolution: {integrity: sha512-P4nbQYQfePJxRSmY+v/KINxVucm4NF3p3s7pJveMTtom52FR4YGltUQLB8idDXwDDWW+eYrWDFbuzUnjoWHF7g==}
+ 
++  redis-errors@1.2.0:
++    resolution: {integrity: sha512-1qny3OExCf0UvUV/5wpYKf2YwPcOqXzkwKKSmKHiE6ZMQs5heeE/c8eXK+PNllPvmjgAbfnsbpkGZWy8cBpn9w==}
++    engines: {node: '>=4'}
++
+   reflect-metadata@0.2.2:
+     resolution: {integrity: sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q==}
+ 
+@@ -2762,6 +2784,9 @@ packages:
+   stack-trace@0.0.10:
+     resolution: {integrity: sha512-KGzahc7puUKkzyMt+IqAep+TVNbKP+k2Lmwhub39m1AsTSkaDutx56aDCo+HLDzf/D26BIHTJWNiTG1KAJiQCg==}
+ 
++  standard-as-callback@2.1.0:
++    resolution: {integrity: sha512-qoRRSyROncaz1z0mvYqIE4lCd9p2R90i6GxW3uZv5ucSu8tU7B5HXUP1gG8pVZsYNVaXjk8ClXHPttLyxAL48A==}
++
+   statuses@2.0.2:
+     resolution: {integrity: sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw==}
+     engines: {node: '>= 0.8'}
+@@ -3576,6 +3601,8 @@ snapshots:
+     optionalDependencies:
+       '@types/node': 24.19.0
+ 
++  '@ioredis/commands@2.0.0': {}
++
+   '@jridgewell/gen-mapping@0.3.13':
+     dependencies:
+       '@jridgewell/sourcemap-codec': 1.6.0
+@@ -4287,6 +4314,8 @@ snapshots:
+ 
+   cli-width@4.1.0: {}
+ 
++  cluster-key-slot@1.1.1: {}
++
+   color-convert@2.0.1:
+     dependencies:
+       color-name: 1.1.4
+@@ -4364,6 +4393,8 @@ snapshots:
+ 
+   delayed-stream@1.0.0: {}
+ 
++  denque@2.1.0: {}
++
+   depd@2.0.0: {}
+ 
+   dequal@2.0.3: {}
+@@ -4761,6 +4792,17 @@ snapshots:
+ 
+   inherits@2.0.4: {}
+ 
++  ioredis@6.0.0(supports-color@8.1.1):
++    dependencies:
++      '@ioredis/commands': 2.0.0
++      cluster-key-slot: 1.1.1
++      debug: 4.4.3(supports-color@8.1.1)
++      denque: 2.1.0
++      redis-errors: 1.2.0
++      standard-as-callback: 2.1.0
++    transitivePeerDependencies:
++      - supports-color
++
+   ipaddr.js@1.9.1:
+     optional: true
+ 
+@@ -5164,6 +5206,8 @@ snapshots:
+ 
+   real-require@1.0.0: {}
+ 
++  redis-errors@1.2.0: {}
++
+   reflect-metadata@0.2.2: {}
+ 
+   require-from-string@2.0.2: {}
+@@ -5326,6 +5370,8 @@ snapshots:
+ 
+   stack-trace@0.0.10: {}
+ 
++  standard-as-callback@2.1.0: {}
++
+   statuses@2.0.2: {}
+ 
+   std-env@4.3.0: {}
 diff --git a/apps/core/src/app.module.ts b/apps/core/src/app.module.ts
-index c178a57..87b2391 100644
+index 87b2391..7798b89 100644
 --- a/apps/core/src/app.module.ts
 +++ b/apps/core/src/app.module.ts
-@@ -1,4 +1,4 @@
--import { ConfigModule } from '@libs/config';
-+import { ConfigModule, NodeEnv } from '@libs/config';
+@@ -1,6 +1,7 @@
+ import { ConfigModule, NodeEnv } from '@libs/config';
  import { DatabaseModule } from '@libs/database';
  import { RabbitMqModule } from '@libs/rabbitmq';
++import { RedisModule } from '@libs/redis';
  import { Module } from '@nestjs/common';
-@@ -19,7 +19,7 @@ import { TestRunsModule } from './test-runs/test-runs.module';
-             inject: [ConfigService],
-             useFactory: (cfg: ConfigService) => ({
-                 schema,
--                logging: cfg.get('NODE_ENV') !== 'production',
-+                logging: cfg.get('NODE_ENV') !== NodeEnv.PRODUCTION,
+ import { ConfigService } from '@nestjs/config';
+ import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+@@ -23,6 +24,7 @@ import { TestRunsModule } from './test-runs/test-runs.module';
              }),
          }),
          RabbitMqModule,
-diff --git a/apps/core/src/shared/decorators/api-base-controller.decorator.ts b/apps/core/src/shared/decorators/api-base-controller.decorator.ts
-index 1c0293b..edac0e5 100644
---- a/apps/core/src/shared/decorators/api-base-controller.decorator.ts
-+++ b/apps/core/src/shared/decorators/api-base-controller.decorator.ts
-@@ -1,6 +1,6 @@
- import { applyDecorators, Controller } from '@nestjs/common';
- import { ApiTags } from '@nestjs/swagger';
--import { ApiErrorResponse } from '@shared/error';
-+import { ApiErrorResponse, ErrorCode } from '@shared/error';
- 
- export const ApiBaseController = (path: string, tag: string, hasJWTGuard = false) => {
-     void hasJWTGuard;
-@@ -8,6 +8,10 @@ export const ApiBaseController = (path: string, tag: string, hasJWTGuard = false
-     return applyDecorators(
-         ApiTags(tag),
-         Controller(path),
--        ApiErrorResponse(500, 'INTERNAL_SERVER_ERROR', 'A critical server-side error occurred'),
-+        ApiErrorResponse(
-+            500,
-+            ErrorCode.INTERNAL_SERVER_ERROR,
-+            'A critical server-side error occurred',
-+        ),
-     );
- };
-diff --git a/apps/core/src/shared/error/codes.ts b/apps/core/src/shared/error/codes.ts
-new file mode 100644
-index 0000000..b1e3546
---- /dev/null
-+++ b/apps/core/src/shared/error/codes.ts
-@@ -0,0 +1,16 @@
-+export const ErrorCode = {
-+    VALIDATION_FAILED: 'VALIDATION_FAILED',
-+    DATABASE_ERROR: 'DATABASE_ERROR',
-+    INTERNAL_SERVER_ERROR: 'INTERNAL_SERVER_ERROR',
-+    BAD_REQUEST: 'BAD_REQUEST',
-+    AUTH_REQUIRED: 'AUTH_REQUIRED',
-+    ACCESS_DENIED: 'ACCESS_DENIED',
-+    NOT_FOUND: 'NOT_FOUND',
-+    CONFLICT: 'CONFLICT',
-+    TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS',
-+    SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
-+    MISSING_VALIDATION_SCHEMA: 'MISSING_VALIDATION_SCHEMA',
-+    RESPONSE_VALIDATION_FAILED: 'RESPONSE_VALIDATION_FAILED',
-+    HTTP_EXCEPTION: 'HTTP_EXCEPTION',
-+} as const;
-+export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
++        RedisModule,
+         TestRunsModule,
+     ],
+     providers: [
 diff --git a/apps/core/src/shared/error/filter.ts b/apps/core/src/shared/error/filter.ts
-index 8f8a7e4..8d601bc 100644
+index 51265ff..8d601bc 100644
 --- a/apps/core/src/shared/error/filter.ts
 +++ b/apps/core/src/shared/error/filter.ts
-@@ -1,3 +1,4 @@
-+import { NodeEnv } from '@libs/config';
- import {
-     type ArgumentsHost,
-     Catch,
-@@ -13,6 +14,7 @@ import { ZodValidationException } from 'nestjs-zod';
- import { PostgresError } from 'postgres';
- import type { ZodError } from 'zod/v4';
- 
-+import { ErrorCode } from './codes';
- import { DATABASE_ERRORS } from './database-errors';
- import { BaseException, type IErrorOptions } from './exception';
- import type { ErrorDetail } from './schema';
-@@ -26,7 +28,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
-     private readonly isDev: boolean;
- 
-     constructor(private readonly configService: ConfigService) {
--        this.isDev = this.configService.get('NODE_ENV') === 'development';
-+        this.isDev = this.configService.get('NODE_ENV') === NodeEnv.DEVELOPMENT;
-     }
- 
-     catch(exception: unknown, host: ArgumentsHost) {
-@@ -67,7 +69,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
- 
-         return response.status(status).send(
-             this.formatErrorResponse(request, status, {
--                code: 'VALIDATION_FAILED',
-+                code: ErrorCode.VALIDATION_FAILED,
-                 message: 'The request data failed validation',
-                 details,
-                 stack: exception.stack,
-@@ -84,9 +86,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
+@@ -86,9 +86,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
          const pgError =
              exception instanceof PostgresError
                  ? exception
@@ -239,1413 +260,417 @@ index 8f8a7e4..8d601bc 100644
          const query = exception instanceof DrizzleQueryError ? exception.query : undefined;
          const params = exception instanceof DrizzleQueryError ? exception.params : undefined;
  
-@@ -102,7 +104,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
+diff --git a/apps/core/src/test-runs/application/dtos/test-runs.dto.ts b/apps/core/src/test-runs/application/dtos/test-runs.dto.ts
+index 1070298..5e3ccbb 100644
+--- a/apps/core/src/test-runs/application/dtos/test-runs.dto.ts
++++ b/apps/core/src/test-runs/application/dtos/test-runs.dto.ts
+@@ -7,6 +7,12 @@ import { testConfigSchema, type TestConfigInput } from '../../domain/schemas';
+ const testRunIdSchema = z.uuid().describe('Test run id');
+ const testRunStatusSchema = z.enum(TEST_RUN_STATUSES).describe('Test run status');
  
-         return response.status(status).send(
-             this.formatErrorResponse(request, status, {
--                code: 'DATABASE_ERROR',
-+                code: ErrorCode.DATABASE_ERROR,
-                 message,
-                 details: [],
-                 stack: undefined,
-@@ -146,7 +148,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
-             typeof res === 'object' && res !== null && 'error' in res && res.error
-                 ? String(res.error)
-                 : null;
--        const code = errorCode ? errorCode.toUpperCase().replace(/\s+/g, '_') : 'HTTP_EXCEPTION';
-+        const code = errorCode
-+            ? errorCode.toUpperCase().replace(/\s+/g, '_')
-+            : ErrorCode.HTTP_EXCEPTION;
- 
-         this.log(host, status, {
-             message: `HTTP exception on ${request.method} ${this.pathOf(request)}: ${code}`,
-@@ -177,7 +181,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
- 
-         return response.status(status).send(
-             this.formatErrorResponse(request, status, {
--                code: 'INTERNAL_SERVER_ERROR',
-+                code: ErrorCode.INTERNAL_SERVER_ERROR,
-                 message: 'An unexpected error occurred on the server',
-                 details: [],
-                 stack,
-diff --git a/apps/core/src/shared/error/index.ts b/apps/core/src/shared/error/index.ts
-index ab2a4a9..df0d102 100644
---- a/apps/core/src/shared/error/index.ts
-+++ b/apps/core/src/shared/error/index.ts
-@@ -1,3 +1,4 @@
-+export * from './codes';
- export * from './database-errors';
- export * from './exception';
- export * from './filter';
-diff --git a/apps/core/src/shared/error/swagger.ts b/apps/core/src/shared/error/swagger.ts
-index 4f8fa3c..56898da 100644
---- a/apps/core/src/shared/error/swagger.ts
-+++ b/apps/core/src/shared/error/swagger.ts
-@@ -1,6 +1,7 @@
- import { applyDecorators } from '@nestjs/common';
- import { ApiResponse, getSchemaPath } from '@nestjs/swagger';
- 
-+import { ErrorCode } from './codes';
- import { GlobalErrorResponse } from './schema';
- 
- type TDetails = { field: string; message: string; code: string }[];
-@@ -39,30 +40,30 @@ export const ApiErrorResponse = (
-     });
- 
- export const ApiBadRequest = (description: string = 'Invalid request') =>
--    applyDecorators(ApiErrorResponse(400, 'BAD_REQUEST', description));
-+    applyDecorators(ApiErrorResponse(400, ErrorCode.BAD_REQUEST, description));
- 
- export const ApiUnauthorized = (
-     description: string = 'The session has expired or the token is invalid',
--) => applyDecorators(ApiErrorResponse(401, 'AUTH_REQUIRED', description));
-+) => applyDecorators(ApiErrorResponse(401, ErrorCode.AUTH_REQUIRED, description));
- 
- export const ApiForbidden = (
-     description: string = 'You do not have sufficient permissions for this action',
--) => applyDecorators(ApiErrorResponse(403, 'ACCESS_DENIED', description));
-+) => applyDecorators(ApiErrorResponse(403, ErrorCode.ACCESS_DENIED, description));
- 
- export const ApiNotFound = (description: string = 'Resource not found') =>
--    applyDecorators(ApiErrorResponse(404, 'NOT_FOUND', description));
-+    applyDecorators(ApiErrorResponse(404, ErrorCode.NOT_FOUND, description));
- 
- export const ApiValidationError = (
-     description: string = 'Input data failed validation',
-     fields: TDetails = [],
--) => applyDecorators(ApiErrorResponse(400, 'VALIDATION_FAILED', description, fields));
-+) => applyDecorators(ApiErrorResponse(400, ErrorCode.VALIDATION_FAILED, description, fields));
- 
- export const ApiConflict = (description: string = 'The resource already exists') =>
--    applyDecorators(ApiErrorResponse(409, 'CONFLICT', description));
-+    applyDecorators(ApiErrorResponse(409, ErrorCode.CONFLICT, description));
- 
- export const ApiTooManyRequests = (description: string = 'Too many attempts') =>
--    applyDecorators(ApiErrorResponse(429, 'TOO_MANY_REQUESTS', description));
-+    applyDecorators(ApiErrorResponse(429, ErrorCode.TOO_MANY_REQUESTS, description));
- 
- export const ApiServiceUnavailable = (
-     description: string = 'The service is temporarily unavailable',
--) => applyDecorators(ApiErrorResponse(503, 'SERVICE_UNAVAILABLE', description));
-+) => applyDecorators(ApiErrorResponse(503, ErrorCode.SERVICE_UNAVAILABLE, description));
-diff --git a/apps/core/src/shared/interceptors/zod-validation.interceptor.ts b/apps/core/src/shared/interceptors/zod-validation.interceptor.ts
-index bf3fb84..0985a4f 100644
---- a/apps/core/src/shared/interceptors/zod-validation.interceptor.ts
-+++ b/apps/core/src/shared/interceptors/zod-validation.interceptor.ts
-@@ -1,3 +1,4 @@
-+import { NodeEnv } from '@libs/config';
- import {
-     CallHandler,
-     ExecutionContext,
-@@ -8,7 +9,7 @@ import {
- import { ConfigService } from '@nestjs/config';
- import { Reflector } from '@nestjs/core';
- import { SKIP_CONTRACT } from '@shared/decorators';
--import { BaseException } from '@shared/error';
-+import { BaseException, ErrorCode } from '@shared/error';
- import { map, Observable } from 'rxjs';
- import { z } from 'zod/v4';
- 
-@@ -22,7 +23,7 @@ export class ZodValidationInterceptor implements NestInterceptor<unknown, unknow
-         private readonly reflector: Reflector,
-         private readonly configService: ConfigService,
-     ) {
--        this.isDev = this.configService.get('NODE_ENV') === 'development';
-+        this.isDev = this.configService.get('NODE_ENV') === NodeEnv.DEVELOPMENT;
-     }
- 
-     intercept(context: ExecutionContext, next: CallHandler<unknown>): Observable<unknown> {
-@@ -48,7 +49,7 @@ export class ZodValidationInterceptor implements NestInterceptor<unknown, unknow
-                 if (!schema) {
-                     throw new BaseException(
-                         {
--                            code: 'MISSING_VALIDATION_SCHEMA',
-+                            code: ErrorCode.MISSING_VALIDATION_SCHEMA,
-                             message: 'No response schema was declared for this endpoint',
-                         },
-                         HttpStatus.INTERNAL_SERVER_ERROR,
-@@ -69,7 +70,7 @@ export class ZodValidationInterceptor implements NestInterceptor<unknown, unknow
- 
-                     throw new BaseException(
-                         {
--                            code: 'RESPONSE_VALIDATION_FAILED',
-+                            code: ErrorCode.RESPONSE_VALIDATION_FAILED,
-                             message: 'The response data does not match the expected format',
-                             details,
-                         },
-diff --git a/apps/core/src/test-runs/application/dtos/index.ts b/apps/core/src/test-runs/application/dtos/index.ts
-index d548a7c..04c46ad 100644
---- a/apps/core/src/test-runs/application/dtos/index.ts
-+++ b/apps/core/src/test-runs/application/dtos/index.ts
-@@ -1 +1,2 @@
- export * from './test-runs.dto';
-+export * from './worker-events.dto';
-diff --git a/apps/core/src/test-runs/application/dtos/worker-events.dto.ts b/apps/core/src/test-runs/application/dtos/worker-events.dto.ts
-new file mode 100644
-index 0000000..669fd32
---- /dev/null
-+++ b/apps/core/src/test-runs/application/dtos/worker-events.dto.ts
-@@ -0,0 +1,45 @@
-+import { z } from 'zod/v4';
-+
-+import { TEST_TYPES, TestRunStatus, WorkerEventType } from '../../domain/constants';
-+
-+const eventTimeSchema = z.iso.datetime({ offset: true }).transform((value) => new Date(value));
-+
-+const eventBaseShape = {
-+    testId: z.uuid(),
-+    testType: z.enum(TEST_TYPES),
-+};
-+
-+const finishedBaseShape = {
-+    ...eventBaseShape,
-+    eventType: z.literal(WorkerEventType.FINISHED),
-+    startedAt: eventTimeSchema,
-+    finishedAt: eventTimeSchema,
-+};
-+
-+const startedEventSchema = z.object({
-+    ...eventBaseShape,
-+    eventType: z.literal(WorkerEventType.STARTED),
-+    timestamp: eventTimeSchema,
++const testRunParamsSchema = z.object({
++    id: testRunIdSchema,
 +});
 +
-+const finishedEventSchema = z.discriminatedUnion('status', [
-+    z.object({
-+        ...finishedBaseShape,
-+        status: z.enum([TestRunStatus.COMPLETED, TestRunStatus.STOPPED]),
-+        result: z.unknown().optional(),
-+    }),
-+    z.object({
-+        ...finishedBaseShape,
-+        status: z.literal(TestRunStatus.FAILED),
-+        reason: z.string().trim().min(1),
-+    }),
-+]);
++export class TestRunParamsDto extends createZodDto(testRunParamsSchema) {}
 +
-+export const workerEventSchema = z.discriminatedUnion('eventType', [
-+    startedEventSchema,
-+    finishedEventSchema,
-+]);
+ export const StartTestRunDto = Object.defineProperty(createZodDto(testConfigSchema), 'name', {
+     value: 'StartTestRunDto',
+ });
+@@ -33,3 +39,14 @@ const testRunResponseSchema = z.object({
+ });
+ 
+ export class TestRunResponseDto extends createZodDto(testRunResponseSchema) {}
 +
-+export type StartedEvent = z.infer<typeof startedEventSchema>;
-+export type FinishedEvent = z.infer<typeof finishedEventSchema>;
-+export type WorkerEvent = z.infer<typeof workerEventSchema>;
-diff --git a/apps/core/src/test-runs/application/use-cases/handle-worker-event.use-case.spec.ts b/apps/core/src/test-runs/application/use-cases/handle-worker-event.use-case.spec.ts
-new file mode 100644
-index 0000000..560dc07
---- /dev/null
-+++ b/apps/core/src/test-runs/application/use-cases/handle-worker-event.use-case.spec.ts
-@@ -0,0 +1,184 @@
-+import { HttpMethod, TestRunStatus, TestType, WorkerEventType } from '../../domain/constants';
-+import { TestRunsRepository } from '../../domain/repositories';
-+import type { SingleConfig } from '../../domain/schemas';
-+import { TestRun } from '../../domain/test-run';
-+import type { FinishedEvent, StartedEvent } from '../dtos';
-+import { HandleWorkerEventUseCase, WorkerEventOutcome } from './handle-worker-event.use-case';
++export type TestRunResponse = z.infer<typeof testRunResponseSchema>;
 +
-+const TEST_ID = 'b3f1c2d4-7a1e-4f0b-9c3a-2e8d5f6a7b90';
-+const UNKNOWN_TEST_ID = '8c2a1f00-7a1e-4f0b-9c3a-2e8d5f6a7b90';
-+
-+const SINGLE_CONFIG: SingleConfig = {
-+    target: { method: HttpMethod.GET, url: 'https://api.example.com/users' },
-+    targetRps: 10,
-+    durationSeconds: 10,
-+};
-+
-+const CREATED_AT = new Date('2026-01-01T00:00:00.000Z');
-+const STORED_STARTED_AT = new Date('2026-01-01T00:01:00.000Z');
-+const EVENT_STARTED_AT = new Date('2026-01-01T00:01:30.000Z');
-+const FINISHED_AT = new Date('2026-01-01T00:02:00.000Z');
-+const RESULT = { durationMs: 60_000 };
-+
-+const STARTED_EVENT: StartedEvent = {
-+    testId: TEST_ID,
-+    testType: TestType.SINGLE,
-+    eventType: WorkerEventType.STARTED,
-+    timestamp: EVENT_STARTED_AT,
-+};
-+
-+const FINISHED_BASE = {
-+    testId: TEST_ID,
-+    testType: TestType.SINGLE,
-+    eventType: WorkerEventType.FINISHED,
-+    startedAt: EVENT_STARTED_AT,
-+    finishedAt: FINISHED_AT,
-+} as const;
-+
-+const COMPLETED_EVENT: FinishedEvent = {
-+    ...FINISHED_BASE,
-+    status: TestRunStatus.COMPLETED,
-+    result: RESULT,
-+};
-+const FAILED_EVENT: FinishedEvent = {
-+    ...FINISHED_BASE,
-+    status: TestRunStatus.FAILED,
-+    reason: 'bad config',
-+};
-+
-+function restoreRun(status: TestRunStatus, result?: unknown): TestRun {
-+    return TestRun.restore({
-+        id: TEST_ID,
-+        type: TestType.SINGLE,
-+        status,
-+        config: SINGLE_CONFIG,
-+        createdAt: CREATED_AT,
-+        startedAt: status === TestRunStatus.PENDING ? undefined : STORED_STARTED_AT,
-+        result,
-+    });
-+}
-+
-+class InMemoryTestRunsRepository implements TestRunsRepository {
-+    stored?: TestRun;
-+    rejectUpdates = false;
-+
-+    async create(run: TestRun): Promise<void> {
-+        this.stored = run;
-+    }
-+
-+    async findById(id: string): Promise<TestRun | undefined> {
-+        if (this.stored?.id !== id) {
-+            return undefined;
-+        }
-+
-+        return TestRun.restore({
-+            id: this.stored.id,
-+            type: this.stored.type,
-+            status: this.stored.status,
-+            config: this.stored.config,
-+            createdAt: this.stored.createdAt,
-+            reason: this.stored.reason,
-+            result: this.stored.result,
-+            startedAt: this.stored.startedAt,
-+            finishedAt: this.stored.finishedAt,
-+        });
-+    }
-+
-+    async updateIfStatus(run: TestRun, expected: TestRunStatus): Promise<boolean> {
-+        if (this.rejectUpdates || this.stored?.status !== expected) {
-+            return false;
-+        }
-+
-+        this.stored = run;
-+        return true;
-+    }
-+}
-+
-+describe('HandleWorkerEventUseCase', () => {
-+    let repository: InMemoryTestRunsRepository;
-+    let useCase: HandleWorkerEventUseCase;
-+
-+    beforeEach(() => {
-+        repository = new InMemoryTestRunsRepository();
-+        useCase = new HandleWorkerEventUseCase(repository);
-+    });
-+
-+    it('applies started on a PENDING run and moves it to RUNNING', async () => {
-+        repository.stored = restoreRun(TestRunStatus.PENDING);
-+
-+        await expect(useCase.execute(STARTED_EVENT)).resolves.toBe(WorkerEventOutcome.APPLIED);
-+
-+        expect(repository.stored?.status).toBe(TestRunStatus.RUNNING);
-+        expect(repository.stored?.startedAt).toEqual(EVENT_STARTED_AT);
-+    });
-+
-+    it('ignores a duplicate started', async () => {
-+        repository.stored = restoreRun(TestRunStatus.PENDING);
-+        await useCase.execute(STARTED_EVENT);
-+
-+        await expect(useCase.execute(STARTED_EVENT)).resolves.toBe(WorkerEventOutcome.IGNORED);
-+
-+        expect(repository.stored?.status).toBe(TestRunStatus.RUNNING);
-+    });
-+
-+    it('ignores started after FAILED', async () => {
-+        repository.stored = restoreRun(TestRunStatus.FAILED);
-+
-+        await expect(useCase.execute(STARTED_EVENT)).resolves.toBe(WorkerEventOutcome.IGNORED);
-+
-+        expect(repository.stored?.status).toBe(TestRunStatus.FAILED);
-+    });
-+
-+    it('applies finished COMPLETED from RUNNING and stores the result', async () => {
-+        repository.stored = restoreRun(TestRunStatus.RUNNING);
-+
-+        await expect(useCase.execute(COMPLETED_EVENT)).resolves.toBe(WorkerEventOutcome.APPLIED);
-+
-+        expect(repository.stored?.status).toBe(TestRunStatus.COMPLETED);
-+        expect(repository.stored?.result).toEqual(RESULT);
-+        expect(repository.stored?.finishedAt).toEqual(FINISHED_AT);
-+    });
-+
-+    it('applies finished from PENDING and takes startedAt from the event', async () => {
-+        repository.stored = restoreRun(TestRunStatus.PENDING);
-+
-+        await expect(useCase.execute(COMPLETED_EVENT)).resolves.toBe(WorkerEventOutcome.APPLIED);
-+
-+        expect(repository.stored?.status).toBe(TestRunStatus.COMPLETED);
-+        expect(repository.stored?.startedAt).toEqual(EVENT_STARTED_AT);
-+    });
-+
-+    it('ignores finished after a final status and keeps the result', async () => {
-+        const storedResult = { durationMs: 1 };
-+        repository.stored = restoreRun(TestRunStatus.COMPLETED, storedResult);
-+
-+        await expect(useCase.execute(COMPLETED_EVENT)).resolves.toBe(WorkerEventOutcome.IGNORED);
-+
-+        expect(repository.stored?.status).toBe(TestRunStatus.COMPLETED);
-+        expect(repository.stored?.result).toEqual(storedResult);
-+    });
-+
-+    it('keeps the reason of a FAILED event', async () => {
-+        repository.stored = restoreRun(TestRunStatus.RUNNING);
-+
-+        await expect(useCase.execute(FAILED_EVENT)).resolves.toBe(WorkerEventOutcome.APPLIED);
-+
-+        expect(repository.stored?.status).toBe(TestRunStatus.FAILED);
-+        expect(repository.stored?.reason).toBe('bad config');
-+    });
-+
-+    it('reports an unknown test run', async () => {
-+        await expect(useCase.execute({ ...STARTED_EVENT, testId: UNKNOWN_TEST_ID })).resolves.toBe(
-+            WorkerEventOutcome.UNKNOWN_TEST_RUN,
-+        );
-+    });
-+
-+    it('ignores the event when updateIfStatus returns false', async () => {
-+        repository.stored = restoreRun(TestRunStatus.PENDING);
-+        repository.rejectUpdates = true;
-+
-+        await expect(useCase.execute(STARTED_EVENT)).resolves.toBe(WorkerEventOutcome.IGNORED);
-+
-+        expect(repository.stored?.status).toBe(TestRunStatus.PENDING);
-+    });
++const stopTestRunResponseSchema = z.object({
++    id: testRunIdSchema,
++    status: testRunStatusSchema,
 +});
-diff --git a/apps/core/src/test-runs/application/use-cases/handle-worker-event.use-case.ts b/apps/core/src/test-runs/application/use-cases/handle-worker-event.use-case.ts
-new file mode 100644
-index 0000000..c51beef
---- /dev/null
-+++ b/apps/core/src/test-runs/application/use-cases/handle-worker-event.use-case.ts
-@@ -0,0 +1,52 @@
-+import { Injectable } from '@nestjs/common';
 +
-+import { TestRunStatus, WorkerEventType } from '../../domain/constants';
++export class StopTestRunResponseDto extends createZodDto(stopTestRunResponseSchema) {}
++
++export type StopTestRunResponse = z.infer<typeof stopTestRunResponseSchema>;
+diff --git a/apps/core/src/test-runs/application/use-cases/get-test-run.use-case.ts b/apps/core/src/test-runs/application/use-cases/get-test-run.use-case.ts
+new file mode 100644
+index 0000000..89c5914
+--- /dev/null
++++ b/apps/core/src/test-runs/application/use-cases/get-test-run.use-case.ts
+@@ -0,0 +1,39 @@
++import { HttpStatus, Injectable } from '@nestjs/common';
++import { BaseException } from '@shared/error';
++
++import { TestRunErrorCodes, TestRunErrorMessages } from '../../domain/errors';
 +import { TestRunsRepository } from '../../domain/repositories';
 +import type { TestRun } from '../../domain/test-run';
-+import type { FinishedEvent, WorkerEvent } from '../dtos';
++import type { TestRunResponse } from '../dtos';
 +
-+export const WorkerEventOutcome = {
-+    APPLIED: 'applied',
-+    IGNORED: 'ignored',
-+    UNKNOWN_TEST_RUN: 'unknown_test_run',
-+} as const;
-+export type WorkerEventOutcome = (typeof WorkerEventOutcome)[keyof typeof WorkerEventOutcome];
++const toTestRunResponse = (run: TestRun): TestRunResponse => ({
++    id: run.id,
++    type: run.type,
++    status: run.status,
++    createdAt: run.createdAt.toISOString(),
++    ...(run.startedAt !== undefined && { startedAt: run.startedAt.toISOString() }),
++    ...(run.finishedAt !== undefined && { finishedAt: run.finishedAt.toISOString() }),
++    ...(run.reason !== undefined && { reason: run.reason }),
++    ...(run.result !== undefined && { result: run.result }),
++});
 +
 +@Injectable()
-+export class HandleWorkerEventUseCase {
++export class GetTestRunUseCase {
 +    constructor(private readonly repository: TestRunsRepository) {}
 +
-+    async execute(event: WorkerEvent): Promise<WorkerEventOutcome> {
-+        const run = await this.repository.findById(event.testId);
++    async execute(id: string): Promise<TestRunResponse> {
++        const run = await this.repository.findById(id);
++
 +        if (!run) {
-+            return WorkerEventOutcome.UNKNOWN_TEST_RUN;
++            throw new BaseException(
++                {
++                    code: TestRunErrorCodes.NOT_FOUND,
++                    message: TestRunErrorMessages[TestRunErrorCodes.NOT_FOUND],
++                },
++                HttpStatus.NOT_FOUND,
++            );
 +        }
 +
-+        const previousStatus = run.status;
-+        const transitioned =
-+            event.eventType === WorkerEventType.STARTED
-+                ? run.markStarted(event.timestamp)
-+                : this.finish(run, event);
-+        if (!transitioned) {
-+            return WorkerEventOutcome.IGNORED;
-+        }
-+
-+        const updated = await this.repository.updateIfStatus(run, previousStatus);
-+        return updated ? WorkerEventOutcome.APPLIED : WorkerEventOutcome.IGNORED;
-+    }
-+
-+    private finish(run: TestRun, event: FinishedEvent): boolean {
-+        const { startedAt, finishedAt } = event;
-+
-+        if (event.status === TestRunStatus.FAILED) {
-+            return run.finish({
-+                status: TestRunStatus.FAILED,
-+                reason: event.reason,
-+                startedAt,
-+                finishedAt,
-+            });
-+        }
-+
-+        return run.finish({ status: event.status, result: event.result, startedAt, finishedAt });
++        return toTestRunResponse(run);
 +    }
 +}
 diff --git a/apps/core/src/test-runs/application/use-cases/index.ts b/apps/core/src/test-runs/application/use-cases/index.ts
-index 9987aa5..8ffd804 100644
+index 8ffd804..fee604e 100644
 --- a/apps/core/src/test-runs/application/use-cases/index.ts
 +++ b/apps/core/src/test-runs/application/use-cases/index.ts
-@@ -1 +1,2 @@
-+export * from './handle-worker-event.use-case';
+@@ -1,2 +1,4 @@
++export * from './get-test-run.use-case';
+ export * from './handle-worker-event.use-case';
  export * from './start-test-run.use-case';
-diff --git a/apps/core/src/test-runs/application/use-cases/start-test-run.use-case.ts b/apps/core/src/test-runs/application/use-cases/start-test-run.use-case.ts
-index 0a32307..b38f074 100644
---- a/apps/core/src/test-runs/application/use-cases/start-test-run.use-case.ts
-+++ b/apps/core/src/test-runs/application/use-cases/start-test-run.use-case.ts
-@@ -1,6 +1,7 @@
- import { HttpStatus, Injectable } from '@nestjs/common';
- import { BaseException } from '@shared/error';
- 
-+import { TestRunStatus } from '../../domain/constants';
- import { TestRunErrorCodes, TestRunErrorMessages } from '../../domain/errors';
- import { WorkerOrchestrator } from '../../domain/ports';
- import { TestRunsRepository } from '../../domain/repositories';
-@@ -25,11 +26,11 @@ export class StartTestRunUseCase {
-             await this.orchestrator.enqueue({ testId: run.id, ...input });
-         } catch (error) {
-             run.finish({
--                status: 'FAILED',
-+                status: TestRunStatus.FAILED,
-                 reason: ENQUEUE_FAILED_REASON,
-                 finishedAt: new Date(),
-             });
--            await this.repository.updateIfStatus(run, 'PENDING');
-+            await this.repository.updateIfStatus(run, TestRunStatus.PENDING);
- 
-             throw new BaseException(
-                 {
-diff --git a/apps/core/src/test-runs/domain/constants/http-methods.ts b/apps/core/src/test-runs/domain/constants/http-methods.ts
-index 73e2f4f..d1709da 100644
---- a/apps/core/src/test-runs/domain/constants/http-methods.ts
-+++ b/apps/core/src/test-runs/domain/constants/http-methods.ts
-@@ -1,2 +1,20 @@
--export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
--export type HttpMethod = (typeof HTTP_METHODS)[number];
-+export const HttpMethod = {
-+    GET: 'GET',
-+    POST: 'POST',
-+    PUT: 'PUT',
-+    PATCH: 'PATCH',
-+    DELETE: 'DELETE',
-+    HEAD: 'HEAD',
-+    OPTIONS: 'OPTIONS',
-+} as const;
-+export type HttpMethod = (typeof HttpMethod)[keyof typeof HttpMethod];
-+
-+export const HTTP_METHODS = [
-+    HttpMethod.GET,
-+    HttpMethod.POST,
-+    HttpMethod.PUT,
-+    HttpMethod.PATCH,
-+    HttpMethod.DELETE,
-+    HttpMethod.HEAD,
-+    HttpMethod.OPTIONS,
-+] as const;
-diff --git a/apps/core/src/test-runs/domain/constants/index.ts b/apps/core/src/test-runs/domain/constants/index.ts
-index 28c5690..9ff4c61 100644
---- a/apps/core/src/test-runs/domain/constants/index.ts
-+++ b/apps/core/src/test-runs/domain/constants/index.ts
-@@ -2,3 +2,4 @@ export * from './http-methods';
- export * from './limits';
- export * from './test-run-status';
- export * from './test-type';
-+export * from './worker-event-type';
-diff --git a/apps/core/src/test-runs/domain/constants/test-run-status.ts b/apps/core/src/test-runs/domain/constants/test-run-status.ts
-index 6e104d6..918c1a8 100644
---- a/apps/core/src/test-runs/domain/constants/test-run-status.ts
-+++ b/apps/core/src/test-runs/domain/constants/test-run-status.ts
-@@ -1,5 +1,23 @@
--export const TEST_RUN_STATUSES = ['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'STOPPED'] as const;
--export type TestRunStatus = (typeof TEST_RUN_STATUSES)[number];
-+export const TestRunStatus = {
-+    PENDING: 'PENDING',
-+    RUNNING: 'RUNNING',
-+    COMPLETED: 'COMPLETED',
-+    FAILED: 'FAILED',
-+    STOPPED: 'STOPPED',
-+} as const;
-+export type TestRunStatus = (typeof TestRunStatus)[keyof typeof TestRunStatus];
- 
--export const FINAL_STATUSES = ['COMPLETED', 'FAILED', 'STOPPED'] as const;
-+export const TEST_RUN_STATUSES = [
-+    TestRunStatus.PENDING,
-+    TestRunStatus.RUNNING,
-+    TestRunStatus.COMPLETED,
-+    TestRunStatus.FAILED,
-+    TestRunStatus.STOPPED,
-+] as const;
-+
-+export const FINAL_STATUSES = [
-+    TestRunStatus.COMPLETED,
-+    TestRunStatus.FAILED,
-+    TestRunStatus.STOPPED,
-+] as const;
- export type FinalStatus = (typeof FINAL_STATUSES)[number];
-diff --git a/apps/core/src/test-runs/domain/constants/test-type.ts b/apps/core/src/test-runs/domain/constants/test-type.ts
-index 10affd7..f1f2c27 100644
---- a/apps/core/src/test-runs/domain/constants/test-type.ts
-+++ b/apps/core/src/test-runs/domain/constants/test-type.ts
-@@ -1,2 +1,14 @@
--export const TEST_TYPES = ['single', 'scenario', 'batch', 'round_robin'] as const;
--export type TestType = (typeof TEST_TYPES)[number];
-+export const TestType = {
-+    SINGLE: 'single',
-+    SCENARIO: 'scenario',
-+    BATCH: 'batch',
-+    ROUND_ROBIN: 'round_robin',
-+} as const;
-+export type TestType = (typeof TestType)[keyof typeof TestType];
-+
-+export const TEST_TYPES = [
-+    TestType.SINGLE,
-+    TestType.SCENARIO,
-+    TestType.BATCH,
-+    TestType.ROUND_ROBIN,
-+] as const;
-diff --git a/apps/core/src/test-runs/domain/constants/worker-event-type.ts b/apps/core/src/test-runs/domain/constants/worker-event-type.ts
++export * from './stop-test-run.use-case';
+diff --git a/apps/core/src/test-runs/application/use-cases/stop-test-run.use-case.ts b/apps/core/src/test-runs/application/use-cases/stop-test-run.use-case.ts
 new file mode 100644
-index 0000000..62dec14
+index 0000000..c560faa
 --- /dev/null
-+++ b/apps/core/src/test-runs/domain/constants/worker-event-type.ts
-@@ -0,0 +1,5 @@
-+export const WorkerEventType = {
-+    STARTED: 'started',
-+    FINISHED: 'finished',
-+} as const;
-+export type WorkerEventType = (typeof WorkerEventType)[keyof typeof WorkerEventType];
-diff --git a/apps/core/src/test-runs/domain/schemas/scenario-config.schema.spec.ts b/apps/core/src/test-runs/domain/schemas/scenario-config.schema.spec.ts
-index 47ac181..858989e 100644
---- a/apps/core/src/test-runs/domain/schemas/scenario-config.schema.spec.ts
-+++ b/apps/core/src/test-runs/domain/schemas/scenario-config.schema.spec.ts
-@@ -1,13 +1,13 @@
--import { MAX_SCENARIO_STEPS } from '../constants';
-+import { HttpMethod, MAX_SCENARIO_STEPS } from '../constants';
- import { scenarioConfigSchema } from './scenario-config.schema';
- 
- const login = {
--    target: { method: 'POST', url: 'https://api.example.com/login' },
-+    target: { method: HttpMethod.POST, url: 'https://api.example.com/login' },
-     extract: [{ name: 'token', path: 'accessToken' }],
- };
- const createTask = {
-     target: {
--        method: 'POST',
-+        method: HttpMethod.POST,
-         url: 'https://api.example.com/tasks',
-         headers: { Authorization: 'Bearer {{token}}' },
-         body: '{"title":"task-{{$uuid}}"}',
-@@ -15,7 +15,7 @@ const createTask = {
-     extract: [{ name: 'taskId', path: 'data.id' }],
- };
- const getTask = {
--    target: { method: 'GET', url: 'https://api.example.com/tasks/{{taskId}}' },
-+    target: { method: HttpMethod.GET, url: 'https://api.example.com/tasks/{{taskId}}' },
- };
- 
- describe('scenarioConfigSchema', () => {
-@@ -26,7 +26,7 @@ describe('scenarioConfigSchema', () => {
-         {
-             name: 'exactly the step limit',
-             steps: Array.from({ length: MAX_SCENARIO_STEPS }, () => ({
--                target: { method: 'GET', url: 'https://api.example.com/health' },
-+                target: { method: HttpMethod.GET, url: 'https://api.example.com/health' },
-             })),
-         },
-     ];
-@@ -39,7 +39,10 @@ describe('scenarioConfigSchema', () => {
-             name: 'step uses its own extracted variable',
-             steps: [
-                 {
--                    target: { method: 'GET', url: 'https://api.example.com/tasks/{{taskId}}' },
-+                    target: {
-+                        method: HttpMethod.GET,
-+                        url: 'https://api.example.com/tasks/{{taskId}}',
-+                    },
-                     extract: [{ name: 'taskId', path: 'id' }],
-                 },
-             ],
-@@ -48,7 +51,7 @@ describe('scenarioConfigSchema', () => {
-             name: 'extract rule without path',
-             steps: [
-                 {
--                    target: { method: 'GET', url: 'https://api.example.com/me' },
-+                    target: { method: HttpMethod.GET, url: 'https://api.example.com/me' },
-                     extract: [{ name: 'userId', path: '' }],
-                 },
-             ],
-@@ -57,19 +60,22 @@ describe('scenarioConfigSchema', () => {
-             name: 'extract name with a dash',
-             steps: [
-                 {
--                    target: { method: 'GET', url: 'https://api.example.com/me' },
-+                    target: { method: HttpMethod.GET, url: 'https://api.example.com/me' },
-                     extract: [{ name: 'user-id', path: 'id' }],
-                 },
-             ],
-         },
-         {
-             name: 'invalid target in step',
--            steps: [login, { target: { method: 'GET', url: 'https://api.example.com/users/:id' } }],
-+            steps: [
-+                login,
-+                { target: { method: HttpMethod.GET, url: 'https://api.example.com/users/:id' } },
-+            ],
-         },
-         {
-             name: 'too many steps',
-             steps: Array.from({ length: MAX_SCENARIO_STEPS + 1 }, () => ({
--                target: { method: 'GET', url: 'https://api.example.com/health' },
-+                target: { method: HttpMethod.GET, url: 'https://api.example.com/health' },
-             })),
-         },
-     ];
-diff --git a/apps/core/src/test-runs/domain/schemas/single-config.schema.spec.ts b/apps/core/src/test-runs/domain/schemas/single-config.schema.spec.ts
-index e249b24..61e54fd 100644
---- a/apps/core/src/test-runs/domain/schemas/single-config.schema.spec.ts
-+++ b/apps/core/src/test-runs/domain/schemas/single-config.schema.spec.ts
-@@ -1,7 +1,7 @@
--import { MAX_TARGET_RPS } from '../constants';
-+import { HttpMethod, MAX_TARGET_RPS } from '../constants';
- import { singleConfigSchema } from './single-config.schema';
- 
--const TARGET = { method: 'GET', url: 'https://api.example.com/users' };
-+const TARGET = { method: HttpMethod.GET, url: 'https://api.example.com/users' };
- 
- describe('singleConfigSchema', () => {
-     const acceptedCases: { name: string; config: unknown }[] = [
-@@ -27,7 +27,7 @@ describe('singleConfigSchema', () => {
-         {
-             name: 'invalid target',
-             config: {
--                target: { method: 'GET', url: '/users' },
-+                target: { method: HttpMethod.GET, url: '/users' },
-                 targetRps: 100,
-                 durationSeconds: 60,
-             },
-diff --git a/apps/core/src/test-runs/domain/schemas/target.schema.spec.ts b/apps/core/src/test-runs/domain/schemas/target.schema.spec.ts
-index 49f3cac..58f5764 100644
---- a/apps/core/src/test-runs/domain/schemas/target.schema.spec.ts
-+++ b/apps/core/src/test-runs/domain/schemas/target.schema.spec.ts
-@@ -1,24 +1,28 @@
-+import { HttpMethod } from '../constants';
- import { targetSchema } from './target.schema';
- 
- describe('targetSchema', () => {
-     const acceptedCases: { name: string; target: unknown }[] = [
--        { name: 'simple get', target: { method: 'GET', url: 'https://api.example.com/users' } },
-+        {
-+            name: 'simple get',
-+            target: { method: HttpMethod.GET, url: 'https://api.example.com/users' },
-+        },
-         {
-             name: 'port and query',
--            target: { method: 'POST', url: 'http://localhost:8080/users?page=2' },
-+            target: { method: HttpMethod.POST, url: 'http://localhost:8080/users?page=2' },
-         },
-         {
-             name: 'scenario variable in path',
--            target: { method: 'GET', url: 'https://api.example.com/tasks/{{taskId}}' },
-+            target: { method: HttpMethod.GET, url: 'https://api.example.com/tasks/{{taskId}}' },
-         },
-         {
-             name: 'generator in path',
--            target: { method: 'DELETE', url: 'https://api.example.com/tasks/{{$uuid}}' },
-+            target: { method: HttpMethod.DELETE, url: 'https://api.example.com/tasks/{{$uuid}}' },
-         },
-         {
-             name: 'headers and body',
-             target: {
--                method: 'POST',
-+                method: HttpMethod.POST,
-                 url: 'https://api.example.com/users',
-                 headers: { 'Content-Type': 'application/json' },
-                 body: '{"email":"a@example.com"}',
-@@ -26,7 +30,7 @@ describe('targetSchema', () => {
-         },
-         {
-             name: 'double-brace variable is not a path parameter',
--            target: { method: 'GET', url: 'https://api.example.com/users/{{id}}' },
-+            target: { method: HttpMethod.GET, url: 'https://api.example.com/users/{{id}}' },
-         },
-     ];
- 
-@@ -34,20 +38,20 @@ describe('targetSchema', () => {
-         { name: 'empty method', target: { method: '', url: 'https://api.example.com' } },
-         { name: 'lowercase method', target: { method: 'get', url: 'https://api.example.com' } },
-         { name: 'unknown method', target: { method: 'FETCH', url: 'https://api.example.com' } },
--        { name: 'empty url', target: { method: 'GET', url: '' } },
--        { name: 'relative url', target: { method: 'GET', url: '/users' } },
-+        { name: 'empty url', target: { method: HttpMethod.GET, url: '' } },
-+        { name: 'relative url', target: { method: HttpMethod.GET, url: '/users' } },
-         {
-             name: 'unsupported scheme',
--            target: { method: 'GET', url: 'ftp://api.example.com/file' },
-+            target: { method: HttpMethod.GET, url: 'ftp://api.example.com/file' },
-         },
--        { name: 'missing host', target: { method: 'GET', url: 'https:///' } },
-+        { name: 'missing host', target: { method: HttpMethod.GET, url: 'https:///' } },
-         {
-             name: 'colon path parameter',
--            target: { method: 'GET', url: 'https://api.example.com/users/:id' },
-+            target: { method: HttpMethod.GET, url: 'https://api.example.com/users/:id' },
-         },
-         {
-             name: 'brace path parameter',
--            target: { method: 'GET', url: 'https://api.example.com/users/{id}/posts' },
-+            target: { method: HttpMethod.GET, url: 'https://api.example.com/users/{id}/posts' },
-         },
-     ];
- 
-@@ -65,7 +69,7 @@ describe('targetSchema', () => {
- 
-     it('reports the unresolved path parameter in the error message', () => {
-         const result = targetSchema.safeParse({
--            method: 'GET',
-+            method: HttpMethod.GET,
-             url: 'https://api.example.com/users/:id',
-         });
- 
-diff --git a/apps/core/src/test-runs/domain/schemas/test-config.schema.spec.ts b/apps/core/src/test-runs/domain/schemas/test-config.schema.spec.ts
-index ff3ed56..3940561 100644
---- a/apps/core/src/test-runs/domain/schemas/test-config.schema.spec.ts
-+++ b/apps/core/src/test-runs/domain/schemas/test-config.schema.spec.ts
-@@ -1,43 +1,46 @@
-+import { HttpMethod, TestType } from '../constants';
- import { testConfigSchema } from './test-config.schema';
- 
- const SINGLE_CONFIG = {
--    target: { method: 'GET', url: 'https://api.example.com/users' },
-+    target: { method: HttpMethod.GET, url: 'https://api.example.com/users' },
-     targetRps: 10,
-     durationSeconds: 10,
- };
- 
- const SCENARIO_CONFIG = {
--    steps: [{ target: { method: 'GET', url: 'https://api.example.com/users' } }],
-+    steps: [{ target: { method: HttpMethod.GET, url: 'https://api.example.com/users' } }],
- };
- 
- describe('testConfigSchema', () => {
-     it('accepts a single test config', () => {
--        expect(testConfigSchema.safeParse({ type: 'single', config: SINGLE_CONFIG }).success).toBe(
--            true,
--        );
-+        expect(
-+            testConfigSchema.safeParse({ type: TestType.SINGLE, config: SINGLE_CONFIG }).success,
-+        ).toBe(true);
-     });
- 
-     it('accepts a scenario test config', () => {
-         expect(
--            testConfigSchema.safeParse({ type: 'scenario', config: SCENARIO_CONFIG }).success,
-+            testConfigSchema.safeParse({ type: TestType.SCENARIO, config: SCENARIO_CONFIG })
-+                .success,
-         ).toBe(true);
-     });
- 
-     it('rejects a single config nested under type scenario', () => {
-         expect(
--            testConfigSchema.safeParse({ type: 'scenario', config: SINGLE_CONFIG }).success,
-+            testConfigSchema.safeParse({ type: TestType.SCENARIO, config: SINGLE_CONFIG }).success,
-         ).toBe(false);
-     });
- 
-     it('rejects the batch type', () => {
--        expect(testConfigSchema.safeParse({ type: 'batch', config: SINGLE_CONFIG }).success).toBe(
--            false,
--        );
-+        expect(
-+            testConfigSchema.safeParse({ type: TestType.BATCH, config: SINGLE_CONFIG }).success,
-+        ).toBe(false);
-     });
- 
-     it('rejects the round_robin type', () => {
-         expect(
--            testConfigSchema.safeParse({ type: 'round_robin', config: SINGLE_CONFIG }).success,
-+            testConfigSchema.safeParse({ type: TestType.ROUND_ROBIN, config: SINGLE_CONFIG })
-+                .success,
-         ).toBe(false);
-     });
- });
-diff --git a/apps/core/src/test-runs/domain/schemas/test-config.schema.ts b/apps/core/src/test-runs/domain/schemas/test-config.schema.ts
-index 763638e..437263f 100644
---- a/apps/core/src/test-runs/domain/schemas/test-config.schema.ts
-+++ b/apps/core/src/test-runs/domain/schemas/test-config.schema.ts
-@@ -1,11 +1,12 @@
- import { z } from 'zod/v4';
- 
-+import { TestType } from '../constants';
- import { scenarioConfigSchema } from './scenario-config.schema';
- import { singleConfigSchema } from './single-config.schema';
- 
- export const testConfigSchema = z.discriminatedUnion('type', [
--    z.object({ type: z.literal('single'), config: singleConfigSchema }),
--    z.object({ type: z.literal('scenario'), config: scenarioConfigSchema }),
-+    z.object({ type: z.literal(TestType.SINGLE), config: singleConfigSchema }),
-+    z.object({ type: z.literal(TestType.SCENARIO), config: scenarioConfigSchema }),
- ]);
- 
- export type TestConfigInput = z.infer<typeof testConfigSchema>;
-diff --git a/apps/core/src/test-runs/domain/test-run.spec.ts b/apps/core/src/test-runs/domain/test-run.spec.ts
-index 7068ca5..c00b9be 100644
---- a/apps/core/src/test-runs/domain/test-run.spec.ts
-+++ b/apps/core/src/test-runs/domain/test-run.spec.ts
-@@ -1,9 +1,9 @@
--import { TEST_RUN_STATUSES, type TestRunStatus } from './constants';
-+import { HttpMethod, TEST_RUN_STATUSES, TestRunStatus, TestType } from './constants';
- import type { SingleConfig } from './schemas';
- import { TestRun } from './test-run';
- 
- const SINGLE_CONFIG: SingleConfig = {
--    target: { method: 'GET', url: 'https://api.example.com/users' },
-+    target: { method: HttpMethod.GET, url: 'https://api.example.com/users' },
-     targetRps: 10,
-     durationSeconds: 10,
- };
-@@ -13,7 +13,7 @@ const STARTED_AT = new Date('2026-01-01T00:01:00.000Z');
- const FINISHED_AT = new Date('2026-01-01T00:02:00.000Z');
- 
- function startedAtFor(status: TestRunStatus): Date | undefined {
--    if (status === 'PENDING') {
-+    if (status === TestRunStatus.PENDING) {
-         return undefined;
-     }
-     return STARTED_AT;
-@@ -30,7 +30,7 @@ function restoreWith(
- ): TestRun {
-     return TestRun.restore({
-         id: 'fixed-id',
--        type: 'single',
-+        type: TestType.SINGLE,
-         status,
-         config: SINGLE_CONFIG,
-         createdAt: CREATED_AT,
-@@ -39,11 +39,14 @@ function restoreWith(
-     });
- }
- 
--type FinishTarget = 'COMPLETED' | 'FAILED' | 'STOPPED';
-+type FinishTarget =
-+    | typeof TestRunStatus.COMPLETED
-+    | typeof TestRunStatus.FAILED
-+    | typeof TestRunStatus.STOPPED;
- 
- function finishInputFor(target: FinishTarget) {
--    if (target === 'FAILED') {
--        return { status: 'FAILED' as const, reason: 'worker crashed', finishedAt: FINISHED_AT };
-+    if (target === TestRunStatus.FAILED) {
-+        return { status: TestRunStatus.FAILED, reason: 'worker crashed', finishedAt: FINISHED_AT };
-     }
-     return { status: target, result: { ok: true }, finishedAt: FINISHED_AT };
- }
-@@ -52,10 +55,10 @@ describe('TestRun', () => {
-     describe('create', () => {
-         it('starts PENDING with the given config and createdAt', () => {
-             const now = new Date('2026-02-01T10:00:00.000Z');
--            const run = TestRun.create({ type: 'scenario', config: { steps: [] }, now });
-+            const run = TestRun.create({ type: TestType.SCENARIO, config: { steps: [] }, now });
- 
--            expect(run.status).toBe('PENDING');
--            expect(run.type).toBe('scenario');
-+            expect(run.status).toBe(TestRunStatus.PENDING);
-+            expect(run.type).toBe(TestType.SCENARIO);
-             expect(run.config).toEqual({ steps: [] });
-             expect(run.createdAt).toBe(now);
-             expect(run.startedAt).toBeUndefined();
-@@ -67,7 +70,7 @@ describe('TestRun', () => {
- 
-         it('defaults createdAt to now when not given', () => {
-             const before = Date.now();
--            const run = TestRun.create({ type: 'single', config: SINGLE_CONFIG });
-+            const run = TestRun.create({ type: TestType.SINGLE, config: SINGLE_CONFIG });
-             const after = Date.now();
- 
-             expect(run.createdAt.getTime()).toBeGreaterThanOrEqual(before);
-@@ -82,9 +85,9 @@ describe('TestRun', () => {
- 
-             const result = run.markStarted(STARTED_AT);
- 
--            if (status === 'PENDING') {
-+            if (status === TestRunStatus.PENDING) {
-                 expect(result).toBe(true);
--                expect(run.status).toBe('RUNNING');
-+                expect(run.status).toBe(TestRunStatus.RUNNING);
-                 expect(run.startedAt).toBe(STARTED_AT);
-             } else {
-                 expect(result).toBe(false);
-@@ -94,18 +97,22 @@ describe('TestRun', () => {
-         });
- 
-         it('is idempotent once RUNNING', () => {
--            const run = restoreWith('PENDING');
-+            const run = restoreWith(TestRunStatus.PENDING);
-             const second = new Date('2026-01-01T00:05:00.000Z');
- 
-             expect(run.markStarted(STARTED_AT)).toBe(true);
-             expect(run.markStarted(second)).toBe(false);
--            expect(run.status).toBe('RUNNING');
-+            expect(run.status).toBe(TestRunStatus.RUNNING);
-             expect(run.startedAt).toBe(STARTED_AT);
-         });
-     });
- 
-     describe('finish', () => {
--        const targets: readonly FinishTarget[] = ['COMPLETED', 'STOPPED', 'FAILED'];
-+        const targets: readonly FinishTarget[] = [
-+            TestRunStatus.COMPLETED,
-+            TestRunStatus.STOPPED,
-+            TestRunStatus.FAILED,
-+        ];
- 
-         for (const target of targets) {
-             it.each(TEST_RUN_STATUSES)(`from %s to ${target}`, (status) => {
-@@ -113,13 +120,14 @@ describe('TestRun', () => {
-                 const input = finishInputFor(target);
- 
-                 const result = run.finish(input);
--                const allowed = status === 'PENDING' || status === 'RUNNING';
-+                const allowed =
-+                    status === TestRunStatus.PENDING || status === TestRunStatus.RUNNING;
- 
-                 if (allowed) {
-                     expect(result).toBe(true);
-                     expect(run.status).toBe(target);
-                     expect(run.finishedAt).toBe(FINISHED_AT);
--                    if (target === 'FAILED') {
-+                    if (target === TestRunStatus.FAILED) {
-                         expect(run.reason).toBe('worker crashed');
-                         expect(run.result).toBeUndefined();
-                     } else {
-@@ -135,10 +143,10 @@ describe('TestRun', () => {
-         }
- 
-         it('fills startedAt when it was not set yet', () => {
--            const run = restoreWith('PENDING');
-+            const run = restoreWith(TestRunStatus.PENDING);
- 
-             const result = run.finish({
--                status: 'COMPLETED',
-+                status: TestRunStatus.COMPLETED,
-                 result: {},
-                 finishedAt: FINISHED_AT,
-                 startedAt: STARTED_AT,
-@@ -149,19 +157,19 @@ describe('TestRun', () => {
-         });
- 
-         it('leaves startedAt unset when finish is called without one and none was set', () => {
--            const run = restoreWith('PENDING');
-+            const run = restoreWith(TestRunStatus.PENDING);
- 
--            run.finish({ status: 'COMPLETED', result: {}, finishedAt: FINISHED_AT });
-+            run.finish({ status: TestRunStatus.COMPLETED, result: {}, finishedAt: FINISHED_AT });
- 
-             expect(run.startedAt).toBeUndefined();
-         });
- 
-         it('never overwrites an already-set startedAt', () => {
--            const run = restoreWith('RUNNING');
-+            const run = restoreWith(TestRunStatus.RUNNING);
-             const otherStartedAt = new Date('2026-01-01T00:09:00.000Z');
- 
-             run.finish({
--                status: 'COMPLETED',
-+                status: TestRunStatus.COMPLETED,
-                 result: {},
-                 finishedAt: FINISHED_AT,
-                 startedAt: otherStartedAt,
-@@ -171,24 +179,24 @@ describe('TestRun', () => {
-         });
- 
-         it.each(['', '   '])('throws for FAILED with reason %j', (reason) => {
--            const run = restoreWith('RUNNING');
-+            const run = restoreWith(TestRunStatus.RUNNING);
- 
-             expect(() =>
--                run.finish({ status: 'FAILED', reason, finishedAt: FINISHED_AT }),
-+                run.finish({ status: TestRunStatus.FAILED, reason, finishedAt: FINISHED_AT }),
-             ).toThrow();
-         });
- 
-         it('never overwrites a final status', () => {
--            const run = restoreWith('COMPLETED', { result: { first: true } });
-+            const run = restoreWith(TestRunStatus.COMPLETED, { result: { first: true } });
- 
-             const result = run.finish({
--                status: 'STOPPED',
-+                status: TestRunStatus.STOPPED,
-                 result: { second: true },
-                 finishedAt: FINISHED_AT,
-             });
- 
-             expect(result).toBe(false);
--            expect(run.status).toBe('COMPLETED');
-+            expect(run.status).toBe(TestRunStatus.COMPLETED);
-             expect(run.result).toEqual({ first: true });
-         });
-     });
-@@ -197,7 +205,7 @@ describe('TestRun', () => {
-         const maxRunningMs = 60_000;
- 
-         it.each(TEST_RUN_STATUSES)('is false for %s when not RUNNING', (status) => {
--            if (status === 'RUNNING') {
-+            if (status === TestRunStatus.RUNNING) {
-                 return;
-             }
-             const run = restoreWith(status);
-@@ -207,14 +215,14 @@ describe('TestRun', () => {
-         });
- 
-         it('is false exactly at the boundary', () => {
--            const run = restoreWith('RUNNING');
-+            const run = restoreWith(TestRunStatus.RUNNING);
-             const now = new Date(STARTED_AT.getTime() + maxRunningMs);
- 
-             expect(run.isStuck(now, maxRunningMs)).toBe(false);
-         });
- 
-         it('is true just past the boundary', () => {
--            const run = restoreWith('RUNNING');
-+            const run = restoreWith(TestRunStatus.RUNNING);
-             const now = new Date(STARTED_AT.getTime() + maxRunningMs + 1);
- 
-             expect(run.isStuck(now, maxRunningMs)).toBe(true);
-@@ -225,7 +233,7 @@ describe('TestRun', () => {
-         const maxPendingMs = 30_000;
- 
-         it.each(TEST_RUN_STATUSES)('is false for %s when not PENDING', (status) => {
--            if (status === 'PENDING') {
-+            if (status === TestRunStatus.PENDING) {
-                 return;
-             }
-             const run = restoreWith(status);
-@@ -235,14 +243,14 @@ describe('TestRun', () => {
-         });
- 
-         it('is false exactly at the boundary', () => {
--            const run = restoreWith('PENDING');
-+            const run = restoreWith(TestRunStatus.PENDING);
-             const now = new Date(CREATED_AT.getTime() + maxPendingMs);
- 
-             expect(run.isPendingTooLong(now, maxPendingMs)).toBe(false);
-         });
- 
-         it('is true just past the boundary', () => {
--            const run = restoreWith('PENDING');
-+            const run = restoreWith(TestRunStatus.PENDING);
-             const now = new Date(CREATED_AT.getTime() + maxPendingMs + 1);
- 
-             expect(run.isPendingTooLong(now, maxPendingMs)).toBe(true);
-diff --git a/apps/core/src/test-runs/domain/test-run.ts b/apps/core/src/test-runs/domain/test-run.ts
-index 49dfbd4..55c5e18 100644
---- a/apps/core/src/test-runs/domain/test-run.ts
-+++ b/apps/core/src/test-runs/domain/test-run.ts
-@@ -1,4 +1,4 @@
--import { FINAL_STATUSES, type TestRunStatus, type TestType } from './constants';
-+import { FINAL_STATUSES, TestRunStatus, type TestType } from './constants';
- import type { ScenarioConfig, SingleConfig, TestConfigInput } from './schemas';
- 
- export type TestRunConfig = SingleConfig | ScenarioConfig;
-@@ -16,8 +16,13 @@ interface TestRunState {
- }
- 
- type FinishInput =
--    | { status: 'COMPLETED' | 'STOPPED'; result: unknown; finishedAt: Date; startedAt?: Date }
--    | { status: 'FAILED'; reason: string; finishedAt: Date; startedAt?: Date };
-+    | {
-+          status: typeof TestRunStatus.COMPLETED | typeof TestRunStatus.STOPPED;
-+          result: unknown;
-+          finishedAt: Date;
-+          startedAt?: Date;
-+      }
-+    | { status: typeof TestRunStatus.FAILED; reason: string; finishedAt: Date; startedAt?: Date };
- 
- const isFinalStatus = (status: TestRunStatus): boolean =>
-     (FINAL_STATUSES as readonly string[]).includes(status);
-@@ -31,7 +36,7 @@ export class TestRun {
-             type: input.type,
-             config: input.config,
-             createdAt: input.now ?? new Date(),
--            status: 'PENDING',
-+            status: TestRunStatus.PENDING,
-         });
-     }
- 
-@@ -86,11 +91,11 @@ export class TestRun {
-     }
- 
-     markStarted(at: Date): boolean {
--        if (this.state.status !== 'PENDING') {
-+        if (this.state.status !== TestRunStatus.PENDING) {
-             return false;
-         }
- 
--        this.state.status = 'RUNNING';
-+        this.state.status = TestRunStatus.RUNNING;
-         this.state.startedAt = at;
-         return true;
-     }
-@@ -100,7 +105,7 @@ export class TestRun {
-             return false;
-         }
- 
--        if (input.status === 'FAILED' && input.reason.trim() === '') {
-+        if (input.status === TestRunStatus.FAILED && input.reason.trim() === '') {
-             throw new Error('A FAILED test run requires a non-empty reason');
-         }
- 
-@@ -108,7 +113,7 @@ export class TestRun {
-         this.state.finishedAt = input.finishedAt;
-         this.state.startedAt ??= input.startedAt;
- 
--        if (input.status === 'FAILED') {
-+        if (input.status === TestRunStatus.FAILED) {
-             this.state.reason = input.reason;
-         } else {
-             this.state.result = input.result;
-@@ -118,7 +123,7 @@ export class TestRun {
-     }
- 
-     isStuck(now: Date, maxRunningMs: number): boolean {
--        if (this.state.status !== 'RUNNING' || this.state.startedAt === undefined) {
-+        if (this.state.status !== TestRunStatus.RUNNING || this.state.startedAt === undefined) {
-             return false;
-         }
- 
-@@ -126,7 +131,7 @@ export class TestRun {
-     }
- 
-     isPendingTooLong(now: Date, maxPendingMs: number): boolean {
--        if (this.state.status !== 'PENDING') {
-+        if (this.state.status !== TestRunStatus.PENDING) {
-             return false;
-         }
- 
-diff --git a/apps/core/src/test-runs/infrastructure/messaging/constants.ts b/apps/core/src/test-runs/infrastructure/messaging/constants.ts
-new file mode 100644
-index 0000000..4ff6342
---- /dev/null
-+++ b/apps/core/src/test-runs/infrastructure/messaging/constants.ts
-@@ -0,0 +1,8 @@
-+export const TEST_JOBS_QUEUE = 'test_jobs';
-+export const TEST_RESULTS_QUEUE = 'test_results';
++++ b/apps/core/src/test-runs/application/use-cases/stop-test-run.use-case.ts
+@@ -0,0 +1,43 @@
++import { HttpStatus, Injectable } from '@nestjs/common';
++import { BaseException } from '@shared/error';
 +
-+export const QUEUE_OPTIONS = {
-+    durable: true,
-+    autoDelete: false,
-+    exclusive: false,
-+} as const;
-diff --git a/apps/core/src/test-runs/infrastructure/messaging/index.ts b/apps/core/src/test-runs/infrastructure/messaging/index.ts
-index 1edf35e..6b78a28 100644
---- a/apps/core/src/test-runs/infrastructure/messaging/index.ts
-+++ b/apps/core/src/test-runs/infrastructure/messaging/index.ts
-@@ -1 +1,2 @@
-+export * from './constants';
- export * from './worker-orchestrator';
-diff --git a/apps/core/src/test-runs/infrastructure/messaging/worker-orchestrator.ts b/apps/core/src/test-runs/infrastructure/messaging/worker-orchestrator.ts
-index 726a183..d00bd94 100644
---- a/apps/core/src/test-runs/infrastructure/messaging/worker-orchestrator.ts
-+++ b/apps/core/src/test-runs/infrastructure/messaging/worker-orchestrator.ts
-@@ -4,8 +4,8 @@ import type { AmqpConnectionManager, ChannelWrapper } from 'amqp-connection-mana
- import type { ConfirmChannel } from 'amqplib';
- 
- import type { TestJob, WorkerOrchestrator } from '../../domain/ports';
-+import { QUEUE_OPTIONS, TEST_JOBS_QUEUE } from './constants';
- 
--const TEST_JOBS_QUEUE = 'test_jobs';
- const PUBLISH_TIMEOUT_MS = 5000;
- 
- @Injectable()
-@@ -20,11 +20,7 @@ export class WorkerOrchestratorImpl implements WorkerOrchestrator {
-         this.channel = connection.createChannel({
-             json: true,
-             setup: async (channel: ConfirmChannel) => {
--                await channel.assertQueue(TEST_JOBS_QUEUE, {
--                    durable: true,
--                    autoDelete: false,
--                    exclusive: false,
--                });
-+                await channel.assertQueue(TEST_JOBS_QUEUE, QUEUE_OPTIONS);
-             },
-         });
- 
-diff --git a/apps/core/src/test-runs/presentation/consumers/index.ts b/apps/core/src/test-runs/presentation/consumers/index.ts
-new file mode 100644
-index 0000000..1e1eba9
---- /dev/null
-+++ b/apps/core/src/test-runs/presentation/consumers/index.ts
-@@ -0,0 +1 @@
-+export * from './worker-events.consumer';
-diff --git a/apps/core/src/test-runs/presentation/consumers/worker-events.consumer.ts b/apps/core/src/test-runs/presentation/consumers/worker-events.consumer.ts
-new file mode 100644
-index 0000000..a57e913
---- /dev/null
-+++ b/apps/core/src/test-runs/presentation/consumers/worker-events.consumer.ts
-@@ -0,0 +1,145 @@
-+import { setTimeout as delay } from 'node:timers/promises';
-+
-+import { AMQP_CONNECTION } from '@libs/rabbitmq';
-+import {
-+    Inject,
-+    Injectable,
-+    Logger,
-+    type OnApplicationBootstrap,
-+    type OnModuleDestroy,
-+} from '@nestjs/common';
-+import type { AmqpConnectionManager, ChannelWrapper } from 'amqp-connection-manager';
-+import type { ConfirmChannel, ConsumeMessage } from 'amqplib';
-+
-+import { workerEventSchema, type WorkerEvent } from '../../application/dtos';
-+import { HandleWorkerEventUseCase, WorkerEventOutcome } from '../../application/use-cases';
-+import { QUEUE_OPTIONS, TEST_RESULTS_QUEUE } from '../../infrastructure/messaging';
-+
-+const PREFETCH_COUNT = 10;
-+const REQUEUE_DELAY_MS = 1000;
-+
-+type ParsedBody = { event: WorkerEvent } | { rejection: string };
-+
-+function parseBody(content: Buffer): ParsedBody {
-+    let body: unknown;
-+    try {
-+        body = JSON.parse(content.toString());
-+    } catch {
-+        return { rejection: 'body is not valid JSON' };
-+    }
-+
-+    const parsed = workerEventSchema.safeParse(body);
-+    if (!parsed.success) {
-+        const issues = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.code}`);
-+        return { rejection: `schema mismatch (${issues.join(', ')})` };
-+    }
-+
-+    return { event: parsed.data };
-+}
-+
-+function describeError(error: unknown): string {
-+    if (!(error instanceof Error)) {
-+        return 'unknown error';
-+    }
-+
-+    const { cause } = error;
-+    const code = cause instanceof Object && 'code' in cause ? String(cause.code) : undefined;
-+    return code ? `${error.name} (${code})` : error.name;
-+}
++import { TestRunErrorCodes, TestRunErrorMessages } from '../../domain/errors';
++import { TestRunStopper } from '../../domain/ports';
++import { TestRunsRepository } from '../../domain/repositories';
++import type { StopTestRunResponse } from '../dtos';
 +
 +@Injectable()
-+export class WorkerEventsConsumer implements OnApplicationBootstrap, OnModuleDestroy {
-+    private readonly logger = new Logger(WorkerEventsConsumer.name);
-+    private channel?: ChannelWrapper;
-+    private consumerGeneration = 0;
-+
++export class StopTestRunUseCase {
 +    constructor(
-+        @Inject(AMQP_CONNECTION)
-+        private readonly connection: AmqpConnectionManager,
-+        private readonly handleWorkerEvent: HandleWorkerEventUseCase,
++        private readonly repository: TestRunsRepository,
++        private readonly stopper: TestRunStopper,
 +    ) {}
 +
-+    onApplicationBootstrap() {
-+        this.channel = this.connection.createChannel({
-+            setup: async (channel: ConfirmChannel) => {
-+                await channel.prefetch(PREFETCH_COUNT);
-+                await channel.assertQueue(TEST_RESULTS_QUEUE, QUEUE_OPTIONS);
++    async execute(id: string): Promise<StopTestRunResponse> {
++        const run = await this.repository.findById(id);
 +
-+                this.consumerGeneration += 1;
-+                const generation = this.consumerGeneration;
-+
-+                await channel.consume(
-+                    TEST_RESULTS_QUEUE,
-+                    (message) => {
-+                        if (message) {
-+                            this.onMessage(message, generation);
-+                        } else {
-+                            this.logger.warn('Test results consumer was cancelled by the broker');
-+                        }
-+                    },
-+                    { noAck: false },
-+                );
-+            },
-+        });
-+
-+        this.channel.on('error', (error: unknown) => {
-+            this.logger.error(`Test results channel error: ${describeError(error)}`);
-+        });
-+    }
-+
-+    async onModuleDestroy() {
-+        await this.channel?.close();
-+    }
-+
-+    private onMessage(message: ConsumeMessage, generation: number) {
-+        this.process(message, generation).catch((error: unknown) => {
-+            this.logger.error(`Failed to settle a worker event: ${describeError(error)}`);
-+        });
-+    }
-+
-+    private async process(message: ConsumeMessage, generation: number) {
-+        const parsed = parseBody(message.content);
-+        if ('rejection' in parsed) {
-+            this.logger.warn(`Dropped a worker event: ${parsed.rejection}`);
-+            this.ack(message, generation);
-+            return;
-+        }
-+
-+        const { event } = parsed;
-+        let outcome: WorkerEventOutcome;
-+        try {
-+            outcome = await this.handleWorkerEvent.execute(event);
-+        } catch (error) {
-+            this.logger.error(
-+                `Failed to apply ${event.eventType} of test run ${event.testId}: ${describeError(error)}`,
++        if (!run) {
++            throw new BaseException(
++                {
++                    code: TestRunErrorCodes.NOT_FOUND,
++                    message: TestRunErrorMessages[TestRunErrorCodes.NOT_FOUND],
++                },
++                HttpStatus.NOT_FOUND,
 +            );
-+            await delay(REQUEUE_DELAY_MS);
-+            this.nackWithRequeue(message, generation);
-+            return;
 +        }
 +
-+        this.logOutcome(event, outcome);
-+        this.ack(message, generation);
-+    }
-+
-+    private logOutcome(event: WorkerEvent, outcome: WorkerEventOutcome) {
-+        const summary = `testId=${event.testId} eventType=${event.eventType} outcome=${outcome}`;
-+        if (outcome === WorkerEventOutcome.UNKNOWN_TEST_RUN) {
-+            this.logger.warn(summary);
-+        } else {
-+            this.logger.debug(summary);
++        if (run.isFinal()) {
++            throw new BaseException(
++                {
++                    code: TestRunErrorCodes.ALREADY_FINISHED,
++                    message: TestRunErrorMessages[TestRunErrorCodes.ALREADY_FINISHED],
++                },
++                HttpStatus.CONFLICT,
++            );
 +        }
-+    }
 +
-+    private ack(message: ConsumeMessage, generation: number) {
-+        if (generation === this.consumerGeneration) {
-+            this.channel?.ack(message);
-+        }
-+    }
++        await this.stopper.requestStop(id);
 +
-+    private nackWithRequeue(message: ConsumeMessage, generation: number) {
-+        if (generation === this.consumerGeneration) {
-+            this.channel?.nack(message, false, true);
-+        }
++        return { id: run.id, status: run.status };
 +    }
 +}
+diff --git a/apps/core/src/test-runs/domain/errors/test-run.errors.ts b/apps/core/src/test-runs/domain/errors/test-run.errors.ts
+index 9402229..8766720 100644
+--- a/apps/core/src/test-runs/domain/errors/test-run.errors.ts
++++ b/apps/core/src/test-runs/domain/errors/test-run.errors.ts
+@@ -1,9 +1,13 @@
+ export const TestRunErrorCodes = {
+     ENQUEUE_FAILED: 'TEST_RUN.ENQUEUE_FAILED',
++    NOT_FOUND: 'TEST_RUN.NOT_FOUND',
++    ALREADY_FINISHED: 'TEST_RUN.ALREADY_FINISHED',
+ } as const;
+ 
+ export type TestRunErrorCode = (typeof TestRunErrorCodes)[keyof typeof TestRunErrorCodes];
+ 
+ export const TestRunErrorMessages: Record<TestRunErrorCode, string> = {
+     [TestRunErrorCodes.ENQUEUE_FAILED]: 'Failed to enqueue the test job',
++    [TestRunErrorCodes.NOT_FOUND]: 'Test run not found',
++    [TestRunErrorCodes.ALREADY_FINISHED]: 'Test run has already finished',
+ };
+diff --git a/apps/core/src/test-runs/domain/ports/index.ts b/apps/core/src/test-runs/domain/ports/index.ts
+index ddb3a1c..e5b9750 100644
+--- a/apps/core/src/test-runs/domain/ports/index.ts
++++ b/apps/core/src/test-runs/domain/ports/index.ts
+@@ -1 +1,2 @@
++export * from './test-run-stopper.interface';
+ export * from './worker-orchestrator.interface';
+diff --git a/apps/core/src/test-runs/domain/ports/test-run-stopper.interface.ts b/apps/core/src/test-runs/domain/ports/test-run-stopper.interface.ts
+new file mode 100644
+index 0000000..e95dfdc
+--- /dev/null
++++ b/apps/core/src/test-runs/domain/ports/test-run-stopper.interface.ts
+@@ -0,0 +1,3 @@
++export abstract class TestRunStopper {
++    abstract requestStop(testId: string): Promise<void>;
++}
+diff --git a/apps/core/src/test-runs/domain/test-run.ts b/apps/core/src/test-runs/domain/test-run.ts
+index 55c5e18..9326488 100644
+--- a/apps/core/src/test-runs/domain/test-run.ts
++++ b/apps/core/src/test-runs/domain/test-run.ts
+@@ -122,6 +122,10 @@ export class TestRun {
+         return true;
+     }
+ 
++    isFinal(): boolean {
++        return isFinalStatus(this.state.status);
++    }
++
+     isStuck(now: Date, maxRunningMs: number): boolean {
+         if (this.state.status !== TestRunStatus.RUNNING || this.state.startedAt === undefined) {
+             return false;
+diff --git a/apps/core/src/test-runs/infrastructure/redis/constants.ts b/apps/core/src/test-runs/infrastructure/redis/constants.ts
+new file mode 100644
+index 0000000..91c831d
+--- /dev/null
++++ b/apps/core/src/test-runs/infrastructure/redis/constants.ts
+@@ -0,0 +1,5 @@
++export const STOPPED_KEY_PREFIX = 'stopped:';
++export const STOP_CHANNEL_PREFIX = 'stop:';
++export const STOPPED_FLAG_VALUE = '1';
++export const STOPPED_FLAG_TTL_SECONDS = 86_400;
++export const STOP_MESSAGE = '';
+diff --git a/apps/core/src/test-runs/infrastructure/redis/index.ts b/apps/core/src/test-runs/infrastructure/redis/index.ts
+new file mode 100644
+index 0000000..d2720a8
+--- /dev/null
++++ b/apps/core/src/test-runs/infrastructure/redis/index.ts
+@@ -0,0 +1,2 @@
++export * from './constants';
++export * from './test-run-stopper';
+diff --git a/apps/core/src/test-runs/infrastructure/redis/test-run-stopper.ts b/apps/core/src/test-runs/infrastructure/redis/test-run-stopper.ts
+new file mode 100644
+index 0000000..4d77909
+--- /dev/null
++++ b/apps/core/src/test-runs/infrastructure/redis/test-run-stopper.ts
+@@ -0,0 +1,30 @@
++import { REDIS_CLIENT } from '@libs/redis';
++import { Inject, Injectable } from '@nestjs/common';
++import type { Redis } from 'ioredis';
++
++import type { TestRunStopper } from '../../domain/ports';
++import {
++    STOP_CHANNEL_PREFIX,
++    STOP_MESSAGE,
++    STOPPED_FLAG_TTL_SECONDS,
++    STOPPED_FLAG_VALUE,
++    STOPPED_KEY_PREFIX,
++} from './constants';
++
++@Injectable()
++export class TestRunStopperImpl implements TestRunStopper {
++    constructor(
++        @Inject(REDIS_CLIENT)
++        private readonly client: Redis,
++    ) {}
++
++    async requestStop(testId: string): Promise<void> {
++        await this.client.set(
++            `${STOPPED_KEY_PREFIX}${testId}`,
++            STOPPED_FLAG_VALUE,
++            'EX',
++            STOPPED_FLAG_TTL_SECONDS,
++        );
++        await this.client.publish(`${STOP_CHANNEL_PREFIX}${testId}`, STOP_MESSAGE);
++    }
++}
+diff --git a/apps/core/src/test-runs/presentation/controllers/test-runs/controller.ts b/apps/core/src/test-runs/presentation/controllers/test-runs/controller.ts
+index 2c7b270..66c6550 100644
+--- a/apps/core/src/test-runs/presentation/controllers/test-runs/controller.ts
++++ b/apps/core/src/test-runs/presentation/controllers/test-runs/controller.ts
+@@ -1,17 +1,44 @@
+-import { Body, Post } from '@nestjs/common';
++import { Body, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+ import { ApiBaseController } from '@shared/decorators';
+ 
+-import { StartTestRunDto, type StartTestRunResponse } from '../../../application/dtos';
+-import { StartTestRunUseCase } from '../../../application/use-cases';
+-import { StartTestRunSwagger } from './swagger';
++import {
++    StartTestRunDto,
++    type StartTestRunResponse,
++    type StopTestRunResponse,
++    TestRunParamsDto,
++    type TestRunResponse,
++} from '../../../application/dtos';
++import {
++    GetTestRunUseCase,
++    StartTestRunUseCase,
++    StopTestRunUseCase,
++} from '../../../application/use-cases';
++import { GetTestRunSwagger, StartTestRunSwagger, StopTestRunSwagger } from './swagger';
+ 
+ @ApiBaseController('test-runs', 'Test runs')
+ export class TestRunsController {
+-    constructor(private readonly startTestRun: StartTestRunUseCase) {}
++    constructor(
++        private readonly startTestRun: StartTestRunUseCase,
++        private readonly getTestRun: GetTestRunUseCase,
++        private readonly stopTestRun: StopTestRunUseCase,
++    ) {}
+ 
+     @Post()
+     @StartTestRunSwagger()
+     start(@Body() dto: StartTestRunDto): Promise<StartTestRunResponse> {
+         return this.startTestRun.execute(dto);
+     }
++
++    @Get(':id')
++    @GetTestRunSwagger()
++    get(@Param() params: TestRunParamsDto): Promise<TestRunResponse> {
++        return this.getTestRun.execute(params.id);
++    }
++
++    @Post(':id/stop')
++    @HttpCode(HttpStatus.ACCEPTED)
++    @StopTestRunSwagger()
++    stop(@Param() params: TestRunParamsDto): Promise<StopTestRunResponse> {
++        return this.stopTestRun.execute(params.id);
++    }
+ }
+diff --git a/apps/core/src/test-runs/presentation/controllers/test-runs/swagger.ts b/apps/core/src/test-runs/presentation/controllers/test-runs/swagger.ts
+index 17b2c49..be51fef 100644
+--- a/apps/core/src/test-runs/presentation/controllers/test-runs/swagger.ts
++++ b/apps/core/src/test-runs/presentation/controllers/test-runs/swagger.ts
+@@ -1,9 +1,14 @@
+ import { applyDecorators, HttpStatus, SetMetadata } from '@nestjs/common';
+ import { ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
+-import { ApiServiceUnavailable, ApiValidationError } from '@shared/error';
++import { ApiConflict, ApiNotFound, ApiServiceUnavailable, ApiValidationError } from '@shared/error';
+ import { ZOD_RESPONSE_TOKEN } from '@shared/interceptors';
+ 
+-import { StartTestRunDto, StartTestRunResponseDto } from '../../../application/dtos';
++import {
++    StartTestRunDto,
++    StartTestRunResponseDto,
++    StopTestRunResponseDto,
++    TestRunResponseDto,
++} from '../../../application/dtos';
+ 
+ export const StartTestRunSwagger = () =>
+     applyDecorators(
+@@ -21,3 +26,37 @@ export const StartTestRunSwagger = () =>
+         ApiServiceUnavailable('Failed to enqueue the test job'),
+         SetMetadata(ZOD_RESPONSE_TOKEN, StartTestRunResponseDto),
+     );
++
++export const GetTestRunSwagger = () =>
++    applyDecorators(
++        ApiOperation({
++            summary: 'Get a test run',
++            description: 'Returns the run status and final result. The config is never included.',
++        }),
++        ApiResponse({
++            status: HttpStatus.OK,
++            description: 'The test run',
++            type: TestRunResponseDto,
++        }),
++        ApiValidationError(),
++        ApiNotFound('Test run not found'),
++        SetMetadata(ZOD_RESPONSE_TOKEN, TestRunResponseDto),
++    );
++
++export const StopTestRunSwagger = () =>
++    applyDecorators(
++        ApiOperation({
++            summary: 'Stop a test run',
++            description:
++                'Requests a stop and returns the current status. The status becomes STOPPED once the worker reports the run as finished.',
++        }),
++        ApiResponse({
++            status: HttpStatus.ACCEPTED,
++            description: 'The stop was requested',
++            type: StopTestRunResponseDto,
++        }),
++        ApiValidationError(),
++        ApiNotFound('Test run not found'),
++        ApiConflict('Test run has already finished'),
++        SetMetadata(ZOD_RESPONSE_TOKEN, StopTestRunResponseDto),
++    );
 diff --git a/apps/core/src/test-runs/test-runs.module.ts b/apps/core/src/test-runs/test-runs.module.ts
-index 1618152..92664c8 100644
+index 92664c8..93ed6a9 100644
 --- a/apps/core/src/test-runs/test-runs.module.ts
 +++ b/apps/core/src/test-runs/test-runs.module.ts
-@@ -1,16 +1,19 @@
+@@ -1,10 +1,16 @@
  import { Module } from '@nestjs/common';
  
--import { StartTestRunUseCase } from './application/use-cases';
-+import { HandleWorkerEventUseCase, StartTestRunUseCase } from './application/use-cases';
- import { WorkerOrchestrator } from './domain/ports';
+-import { HandleWorkerEventUseCase, StartTestRunUseCase } from './application/use-cases';
+-import { WorkerOrchestrator } from './domain/ports';
++import {
++    GetTestRunUseCase,
++    HandleWorkerEventUseCase,
++    StartTestRunUseCase,
++    StopTestRunUseCase,
++} from './application/use-cases';
++import { TestRunStopper, WorkerOrchestrator } from './domain/ports';
  import { TestRunsRepository } from './domain/repositories';
  import { WorkerOrchestratorImpl } from './infrastructure/messaging';
  import { TestRunsRepositoryImpl } from './infrastructure/persistence/repository';
-+import { WorkerEventsConsumer } from './presentation/consumers';
++import { TestRunStopperImpl } from './infrastructure/redis';
+ import { WorkerEventsConsumer } from './presentation/consumers';
  import { TestRunsController } from './presentation/controllers';
  
- @Module({
+@@ -12,10 +18,13 @@ import { TestRunsController } from './presentation/controllers';
      controllers: [TestRunsController],
      providers: [
          StartTestRunUseCase,
-+        HandleWorkerEventUseCase,
-+        WorkerEventsConsumer,
++        GetTestRunUseCase,
++        StopTestRunUseCase,
+         HandleWorkerEventUseCase,
+         WorkerEventsConsumer,
          { provide: TestRunsRepository, useClass: TestRunsRepositoryImpl },
          { provide: WorkerOrchestrator, useClass: WorkerOrchestratorImpl },
++        { provide: TestRunStopper, useClass: TestRunStopperImpl },
      ],
+     exports: [TestRunsRepository],
+ })
+diff --git a/apps/core/tsconfig.json b/apps/core/tsconfig.json
+index a8caea4..b2c9b23 100644
+--- a/apps/core/tsconfig.json
++++ b/apps/core/tsconfig.json
+@@ -43,6 +43,8 @@
+             "@libs/database/*": ["./libs/database/src/*"],
+             "@libs/rabbitmq": ["./libs/rabbitmq/src"],
+             "@libs/rabbitmq/*": ["./libs/rabbitmq/src/*"],
++            "@libs/redis": ["./libs/redis/src"],
++            "@libs/redis/*": ["./libs/redis/src/*"],
+             "@core/*": ["./src/*"],
+             "@shared/*": ["./src/shared/*"]
+         }
+diff --git a/apps/core/vitest.config.ts b/apps/core/vitest.config.ts
+index f8c26f2..25e52bb 100644
+--- a/apps/core/vitest.config.ts
++++ b/apps/core/vitest.config.ts
+@@ -12,6 +12,7 @@ export default defineConfig({
+         alias: {
+             '@core': path.resolve(__dirname, './src'),
+             '@libs/rabbitmq': path.resolve(__dirname, './libs/rabbitmq/src'),
++            '@libs/redis': path.resolve(__dirname, './libs/redis/src'),
+             '@shared': path.resolve(__dirname, './src/shared'),
+         },
+         environment: 'node',

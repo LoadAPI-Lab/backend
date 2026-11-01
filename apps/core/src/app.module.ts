@@ -1,6 +1,7 @@
 import { ConfigModule, NodeEnv } from '@libs/config';
 import { DatabaseModule } from '@libs/database';
 import { RabbitMqModule } from '@libs/rabbitmq';
+import { RedisModule } from '@libs/redis';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
@@ -23,6 +24,7 @@ import { TestRunsModule } from './test-runs/test-runs.module';
             }),
         }),
         RabbitMqModule,
+        RedisModule,
         TestRunsModule,
     ],
     providers: [
