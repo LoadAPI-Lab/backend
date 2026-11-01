@@ -1,5 +1,6 @@
 services:
   core:
+    image: loadapi-core-dev
     build:
       target: dev
     environment:

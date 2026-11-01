@@ -4,16 +4,17 @@ Local stack: PostgreSQL, Redis, RabbitMQ, Core, worker, test server.
 
 Run all commands from the repository root.
 
-`apps/core/.env` must exist before starting the stack:
+`infra/.env` is the only file the Docker stack reads. The apps' own `.env` files are only for running outside Docker.
+
+Put the provided `.env` at `infra/.env`, or create it from the example, then start the stack:
 
 ```bash
-cp apps/core/.env.example apps/core/.env
+cp infra/.env.example infra/.env
+docker compose -f infra/docker-compose.yml up -d
 ```
 
 ```bash
-cp infra/.env.example infra/.env   # optional: change ports and credentials
-
-docker compose -f infra/docker-compose.yml up -d --build   # start
+docker compose -f infra/docker-compose.yml up -d --build   # rebuild from source and start
 docker compose -f infra/docker-compose.yml -f infra/docker-compose.dev.yml up -d --build core   # core in dev mode with watch
 docker compose -f infra/docker-compose.yml ps              # status
 docker compose -f infra/docker-compose.yml logs -f worker  # logs
@@ -27,7 +28,7 @@ Multiple workers:
 docker compose -f infra/docker-compose.yml up -d --build --scale worker=3
 ```
 
-`MAX_CONCURRENT_TESTS` in `apps/core/.env` must equal the number of worker replicas.
+`MAX_CONCURRENT_TESTS` in `infra/.env` must equal the number of worker replicas.
 
 | Service | URL |
 |---|---|
@@ -36,3 +37,14 @@ docker compose -f infra/docker-compose.yml up -d --build --scale worker=3
 | RabbitMQ UI | http://localhost:15672 (`loadapi` / `loadapi`) |
 | Redis | `localhost:6379` |
 | PostgreSQL | `localhost:5432` (`loadapi` / `loadapi`) |
+
+## Run with published images
+
+```bash
+cp infra/.env.example infra/.env
+docker login ghcr.io
+docker compose -f infra/docker-compose.yml pull core worker testserver
+docker compose -f infra/docker-compose.yml up -d
+```
+
+`docker login` is only needed if the packages are private. `IMAGE_TAG` selects the image tag (default `dev`).

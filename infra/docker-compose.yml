@@ -50,12 +50,13 @@ services:
       retries: 5
 
   core:
+    image: ghcr.io/loadapi-lab/backend/core:${IMAGE_TAG:-dev}
     build:
       context: ../apps/core
       target: prod
     restart: unless-stopped
     env_file:
-      - path: ../apps/core/.env
+      - path: .env
     environment:
       NODE_ENV: production
       PORT: 3001
@@ -79,11 +80,12 @@ services:
       start_period: 20s
 
   worker:
+    image: ghcr.io/loadapi-lab/backend/worker:${IMAGE_TAG:-dev}
     build:
       context: ../apps/worker
     restart: unless-stopped
     env_file:
-      - path: ../apps/worker/.env
+      - path: .env
     environment:
       REDIS_URL: redis://redis:6379/0
       RABBITMQ_URL: amqp://${RABBITMQ_USER:-loadapi}:${RABBITMQ_PASSWORD:-loadapi}@rabbitmq:5672/
@@ -94,6 +96,7 @@ services:
         condition: service_healthy
 
   testserver:
+    image: ghcr.io/loadapi-lab/backend/testserver:${IMAGE_TAG:-dev}
     build:
       context: ../apps/testserver
     environment:
