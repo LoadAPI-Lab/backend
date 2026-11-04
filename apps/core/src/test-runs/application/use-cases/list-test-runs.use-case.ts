@@ -1,36 +1,19 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
-import { BaseException } from '@shared/error';
+import { Injectable } from '@nestjs/common';
 
-import { TestRunErrorCodes, TestRunErrorMessages } from '../../domain/errors';
+import { TestRunErrorCodes, testRunException } from '../../domain/errors';
 import { type TestRunPageCursor, TestRunsRepository } from '../../domain/repositories';
-import type { TestRun } from '../../domain/test-run';
-import type { ListTestRunsQueryDto, ListTestRunsResponse, TestRunListItem } from '../dtos';
+import type { ListTestRunsQueryDto, ListTestRunsResponse } from '../dtos';
+import { toTestRunListItem } from '../mappers';
 import { decodeTestRunCursor, encodeTestRunCursor } from '../pagination';
 
 const PAGE_START = 0;
 const LAST_ITEM = -1;
 
-const toTestRunListItem = (run: TestRun): TestRunListItem => ({
-    id: run.id,
-    type: run.type,
-    status: run.status,
-    createdAt: run.createdAt.toISOString(),
-    ...(run.startedAt !== undefined && { startedAt: run.startedAt.toISOString() }),
-    ...(run.finishedAt !== undefined && { finishedAt: run.finishedAt.toISOString() }),
-    ...(run.reason !== undefined && { reason: run.reason }),
-});
-
 const decodeCursorOrThrow = (encoded: string): TestRunPageCursor => {
     const cursor = decodeTestRunCursor(encoded);
 
     if (!cursor) {
-        throw new BaseException(
-            {
-                code: TestRunErrorCodes.INVALID_CURSOR,
-                message: TestRunErrorMessages[TestRunErrorCodes.INVALID_CURSOR],
-            },
-            HttpStatus.BAD_REQUEST,
-        );
+        throw testRunException(TestRunErrorCodes.INVALID_CURSOR);
     }
 
     return cursor;

@@ -1,7 +1,6 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
-import { BaseException } from '@shared/error';
+import { Injectable } from '@nestjs/common';
 
-import { TestRunErrorCodes, TestRunErrorMessages } from '../../domain/errors';
+import { TestRunErrorCodes, testRunException } from '../../domain/errors';
 import { TestRunStopper } from '../../domain/ports';
 import { TestRunsRepository } from '../../domain/repositories';
 import type { StopTestRunResponse } from '../dtos';
@@ -17,23 +16,11 @@ export class StopTestRunUseCase {
         const run = await this.repository.findById(id);
 
         if (!run) {
-            throw new BaseException(
-                {
-                    code: TestRunErrorCodes.NOT_FOUND,
-                    message: TestRunErrorMessages[TestRunErrorCodes.NOT_FOUND],
-                },
-                HttpStatus.NOT_FOUND,
-            );
+            throw testRunException(TestRunErrorCodes.NOT_FOUND);
         }
 
         if (run.isFinal()) {
-            throw new BaseException(
-                {
-                    code: TestRunErrorCodes.ALREADY_FINISHED,
-                    message: TestRunErrorMessages[TestRunErrorCodes.ALREADY_FINISHED],
-                },
-                HttpStatus.CONFLICT,
-            );
+            throw testRunException(TestRunErrorCodes.ALREADY_FINISHED);
         }
 
         await this.stopper.requestStop(id);

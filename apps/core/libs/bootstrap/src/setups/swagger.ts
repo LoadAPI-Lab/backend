@@ -1,5 +1,6 @@
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ACCESS_TOKEN_COOKIE } from '@shared/constants';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 
 import type { SwaggerOptions } from '../interfaces';
@@ -15,7 +16,7 @@ export function setupSwagger(
         .setTitle(title)
         .setDescription(description)
         .setVersion(version)
-        .addBearerAuth()
+        .addCookieAuth(ACCESS_TOKEN_COOKIE, { type: 'apiKey' }, ACCESS_TOKEN_COOKIE)
         .addServer(`http://localhost:${servers.port}`, 'Local');
 
     if (servers.publicUrl) {

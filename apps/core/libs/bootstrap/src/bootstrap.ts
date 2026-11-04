@@ -6,12 +6,13 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createId } from '@paralleldrive/cuid2';
+import { API_VERSION } from '@shared/constants';
 
 import type { BootstrapOptions } from './interfaces';
 import { setupLogger, setupSwagger, withThrottler } from './setups';
 
 export async function bootstrapApp(options: BootstrapOptions) {
-    const { appModule, apiVersion = '1', swagger, setupApp } = options;
+    const { appModule, apiVersion = API_VERSION, swagger, setupApp } = options;
 
     const adapter = new FastifyAdapter({
         requestIdHeader: 'x-request-id',

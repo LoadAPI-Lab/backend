@@ -2,8 +2,9 @@ import { jwtSecretValidation } from '@libs/config/helpers/jwt-secret-validation'
 import { z } from 'zod/v4';
 
 import { NodeEnv } from './constants';
+import { DURATION_PATTERN } from './helpers/duration';
 
-const duration = z.string().regex(/^[0-9]+[smhdw]$/, {
+const duration = z.string().regex(DURATION_PATTERN, {
     message: 'Use a number with a suffix s, m, h, d or w, for example 15m or 30d',
 });
 

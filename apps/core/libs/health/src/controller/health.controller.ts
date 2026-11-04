@@ -1,12 +1,13 @@
 import { Get, HttpStatus, Version, VERSION_NEUTRAL } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import { ApiBaseController } from '@shared/decorators';
+import { ApiBaseController, Public } from '@shared/decorators';
 import { BaseException } from '@shared/error';
 
 import { HealthErrorCodes, HealthErrorMessages } from '../errors';
 import { HealthService } from '../health.service';
 import { GetHealthSwagger } from './health.swagger';
 
+@Public()
 @SkipThrottle()
 @ApiBaseController('health', 'Health')
 export class HealthController {
