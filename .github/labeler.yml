@@ -24,9 +24,14 @@ core/auth:
   - changed-files:
       - any-glob-to-any-file: 'apps/core/src/auth/**'
 
-core/shared:
+core/users:
   - changed-files:
-      - any-glob-to-any-file: 'apps/core/src/shared/**'
+      - any-glob-to-any-file: 'apps/core/src/users/**'
+
+core/test-runs:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/core/src/test-runs/**'
+
 
 # ---------- worker ----------
 worker:
@@ -91,8 +96,8 @@ devops:
 
 bench:
   - changed-files:
-      - any-glob-to-any-file: ['bench/**', 'LICENSE']
+      - any-glob-to-any-file: [ 'bench/**', 'LICENSE' ]
 
 docs:
   - changed-files:
-      - any-glob-to-any-file: ['**/*.md', 'LICENSE']
+      - any-glob-to-any-file: [ '**/*.md', 'LICENSE' ]
