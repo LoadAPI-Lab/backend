@@ -14,6 +14,7 @@ import type { Redis } from 'ioredis';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 import { version } from '../package.json';
+import { AuthModule } from './auth/auth.module';
 import { TestRunsModule } from './test-runs/test-runs.module';
 import { UsersModule } from './users/users.module';
 
@@ -48,6 +49,7 @@ import { UsersModule } from './users/users.module';
         }),
         TestRunsModule,
         UsersModule,
+        AuthModule,
     ],
     providers: [
         {

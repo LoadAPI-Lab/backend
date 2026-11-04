@@ -1,17 +1,25 @@
-import { applyDecorators, Controller } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { applyDecorators, Controller, HttpStatus } from '@nestjs/common';
+import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
+import {
+    ACCESS_TOKEN_COOKIE,
+    UNAUTHENTICATED_ERROR_CODE,
+    UNAUTHENTICATED_ERROR_MESSAGE,
+} from '@shared/constants';
 import { ApiErrorResponse, ErrorCode } from '@shared/error';
 
-export const ApiBaseController = (path: string, tag: string, hasJWTGuard = false) => {
-    void hasJWTGuard;
-
-    return applyDecorators(
+export const ApiBaseController = (path: string, tag: string) =>
+    applyDecorators(
         ApiTags(tag),
         Controller(path),
+        ApiCookieAuth(ACCESS_TOKEN_COOKIE),
         ApiErrorResponse(
-            500,
+            HttpStatus.UNAUTHORIZED,
+            UNAUTHENTICATED_ERROR_CODE,
+            UNAUTHENTICATED_ERROR_MESSAGE,
+        ),
+        ApiErrorResponse(
+            HttpStatus.INTERNAL_SERVER_ERROR,
             ErrorCode.INTERNAL_SERVER_ERROR,
             'A critical server-side error occurred',
         ),
     );
-};

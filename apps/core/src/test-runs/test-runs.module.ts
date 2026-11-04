@@ -1,39 +1,23 @@
 import { Module } from '@nestjs/common';
 
-import {
-    ExpireStaleTestRunsUseCase,
-    GetTestRunUseCase,
-    HandleWorkerEventUseCase,
-    ListTestRunsUseCase,
-    StartTestRunUseCase,
-    StopTestRunUseCase,
-    WatchTestRunUseCase,
-} from './application/use-cases';
-import { LiveFeed, TestRunStopper, WorkerOrchestrator } from './domain/ports';
+import { USE_CASES } from './application/use-cases';
 import { TestRunsRepository } from './domain/repositories';
-import { WorkerOrchestratorImpl } from './infrastructure/messaging';
-import { TestRunsRepositoryImpl } from './infrastructure/persistence/repository';
-import { LiveFeedImpl, TestRunStopperImpl } from './infrastructure/redis';
-import { WorkerEventsConsumer } from './presentation/consumers';
-import { TestRunsController } from './presentation/controllers';
-import { WatchdogScheduler } from './presentation/schedulers';
+import { MESSAGING_PROVIDERS } from './infrastructure/messaging';
+import { REPOSITORIES } from './infrastructure/persistence/repository';
+import { REDIS_PROVIDERS } from './infrastructure/redis';
+import { CONSUMERS } from './presentation/consumers';
+import { CONTROLLERS } from './presentation/controllers';
+import { SCHEDULERS } from './presentation/schedulers';
 
 @Module({
-    controllers: [TestRunsController],
+    controllers: [...CONTROLLERS],
     providers: [
-        StartTestRunUseCase,
-        GetTestRunUseCase,
-        ListTestRunsUseCase,
-        StopTestRunUseCase,
-        WatchTestRunUseCase,
-        HandleWorkerEventUseCase,
-        ExpireStaleTestRunsUseCase,
-        WorkerEventsConsumer,
-        WatchdogScheduler,
-        { provide: TestRunsRepository, useClass: TestRunsRepositoryImpl },
-        { provide: WorkerOrchestrator, useClass: WorkerOrchestratorImpl },
-        { provide: TestRunStopper, useClass: TestRunStopperImpl },
-        { provide: LiveFeed, useClass: LiveFeedImpl },
+        ...USE_CASES,
+        ...REPOSITORIES,
+        ...MESSAGING_PROVIDERS,
+        ...REDIS_PROVIDERS,
+        ...CONSUMERS,
+        ...SCHEDULERS,
     ],
     exports: [TestRunsRepository],
 })

@@ -48,3 +48,34 @@ docker compose -f infra/docker-compose.yml up -d
 ```
 
 `docker login` is only needed if the packages are private. `IMAGE_TAG` selects the image tag (default `dev`).
+
+## OAuth sign-in
+
+Users sign in with GitHub or Google. Core starts without OAuth keys; `GET /v1/oauth/providers` lists only the providers whose client id and secret are set.
+
+GitHub OAuth App (GitHub → Settings → Developer settings → OAuth Apps → New OAuth App):
+
+- Homepage URL: `http://localhost:3000`
+- Authorization callback URL: `http://localhost:3001/v1/oauth/github/callback`
+- After registering, generate a client secret.
+
+Google OAuth client (Google Cloud Console → APIs & Services):
+
+- Configure the OAuth consent screen (External, add your account as a test user).
+- Credentials → Create credentials → OAuth client ID → Web application.
+- Authorized redirect URI: `http://localhost:3001/v1/oauth/google/callback`
+
+Fill in `infra/.env` and restart Core:
+
+```bash
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+```
+
+```bash
+docker compose -f infra/docker-compose.yml up -d core
+```
+
+After sign-in Core sets httpOnly cookies and redirects to `FRONTEND_URL/oauth/callback` (with `?error=<code>` on failure). `CORS_ALLOWED_ORIGINS` must contain the frontend origin: non-GET requests from other origins are rejected. On a deployed API set `API_PUBLIC_URL`; the callback URLs are built from it and must be registered with that host.
