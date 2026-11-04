@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 
 import { USE_CASES } from './application/use-cases';
-import { TestRunsRepository } from './domain/repositories';
 import { MESSAGING_PROVIDERS } from './infrastructure/messaging';
 import { REPOSITORIES } from './infrastructure/persistence/repository';
 import { REDIS_PROVIDERS } from './infrastructure/redis';
@@ -19,6 +18,5 @@ import { SCHEDULERS } from './presentation/schedulers';
         ...CONSUMERS,
         ...SCHEDULERS,
     ],
-    exports: [TestRunsRepository],
 })
 export class TestRunsModule {}

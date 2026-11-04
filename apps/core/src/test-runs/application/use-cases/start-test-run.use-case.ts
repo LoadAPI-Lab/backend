@@ -1,9 +1,8 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BaseException } from '@shared/error';
 
 import { TestRunStatus } from '../../domain/constants';
-import { TestRunErrorCodes, TestRunErrorMessages } from '../../domain/errors';
+import { TestRunErrorCodes, testRunException } from '../../domain/errors';
 import { WorkerOrchestrator } from '../../domain/ports';
 import { TestRunsRepository } from '../../domain/repositories';
 import type { TestConfigInput } from '../../domain/schemas';
@@ -27,13 +26,7 @@ export class StartTestRunUseCase {
     async execute(input: TestConfigInput): Promise<StartTestRunResponse> {
         const activeRuns = await this.repository.countActive();
         if (activeRuns >= this.maxConcurrentTests) {
-            throw new BaseException(
-                {
-                    code: TestRunErrorCodes.CAPACITY_EXCEEDED,
-                    message: TestRunErrorMessages[TestRunErrorCodes.CAPACITY_EXCEEDED],
-                },
-                HttpStatus.SERVICE_UNAVAILABLE,
-            );
+            throw testRunException(TestRunErrorCodes.CAPACITY_EXCEEDED);
         }
 
         const run = TestRun.create(input);
@@ -49,14 +42,7 @@ export class StartTestRunUseCase {
             });
             await this.repository.updateIfStatus(run, TestRunStatus.PENDING);
 
-            throw new BaseException(
-                {
-                    code: TestRunErrorCodes.ENQUEUE_FAILED,
-                    message: TestRunErrorMessages[TestRunErrorCodes.ENQUEUE_FAILED],
-                },
-                HttpStatus.SERVICE_UNAVAILABLE,
-                error,
-            );
+            throw testRunException(TestRunErrorCodes.ENQUEUE_FAILED, { cause: error });
         }
 
         return { id: run.id, status: run.status };

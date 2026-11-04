@@ -1,4 +1,9 @@
-import type { UsersRepository } from '@core/users/domain/repositories';
+import type {
+    CreateUserCommand,
+    CreateUserUseCase,
+    FindUserByEmailQuery,
+    GetUserByIdQuery,
+} from '@core/users/application/use-cases';
 import { User } from '@core/users/domain/user';
 import { ConfigService } from '@nestjs/config';
 
@@ -18,19 +23,40 @@ const PROFILE: OAuthProfile = {
     avatarUrl: 'https://avatars.example.com/u/583231',
 };
 
-class FakeUsersRepository implements UsersRepository {
+const asUseCase = <UseCase extends { execute: unknown }>(fake: Pick<UseCase, 'execute'>): UseCase =>
+    fake as UseCase;
+
+class FakeUsers {
     users: User[] = [];
+}
 
-    async findById(id: string): Promise<User | null> {
-        return this.users.find((user) => user.id === id) ?? null;
+class FakeGetUserByIdQuery implements Pick<GetUserByIdQuery, 'execute'> {
+    constructor(private readonly store: FakeUsers) {}
+
+    async execute(id: string): Promise<User> {
+        const user = this.store.users.find((candidate) => candidate.id === id);
+        if (!user) {
+            throw new Error(`User ${id} not found`);
+        }
+        return user;
     }
+}
 
-    async findByEmail(email: string): Promise<User | null> {
-        return this.users.find((user) => user.email === email) ?? null;
+class FakeFindUserByEmailQuery implements Pick<FindUserByEmailQuery, 'execute'> {
+    constructor(private readonly store: FakeUsers) {}
+
+    async execute(email: string): Promise<User | null> {
+        return this.store.users.find((user) => user.email === email) ?? null;
     }
+}
 
-    async create(user: User): Promise<void> {
-        this.users.push(user);
+class FakeCreateUserUseCase implements Pick<CreateUserUseCase, 'execute'> {
+    constructor(private readonly store: FakeUsers) {}
+
+    async execute(command: CreateUserCommand): Promise<User> {
+        const user = User.create(command);
+        this.store.users.push(user);
+        return user;
     }
 }
 
@@ -89,17 +115,19 @@ class FakeTokenService implements TokenService {
 const existingUser = (email = PROFILE.email): User => User.create({ email, name: 'Existing' });
 
 describe('CompleteOAuthLoginUseCase', () => {
-    let users: FakeUsersRepository;
+    let users: FakeUsers;
     let identities: FakeIdentitiesRepository;
     let sessions: FakeSessionsRepository;
     let useCase: CompleteOAuthLoginUseCase;
 
     beforeEach(() => {
-        users = new FakeUsersRepository();
+        users = new FakeUsers();
         identities = new FakeIdentitiesRepository();
         sessions = new FakeSessionsRepository();
         useCase = new CompleteOAuthLoginUseCase(
-            users,
+            asUseCase<GetUserByIdQuery>(new FakeGetUserByIdQuery(users)),
+            asUseCase<FindUserByEmailQuery>(new FakeFindUserByEmailQuery(users)),
+            asUseCase<CreateUserUseCase>(new FakeCreateUserUseCase(users)),
             identities,
             sessions,
             new FakeTokenService(),

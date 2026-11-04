@@ -1,10 +1,12 @@
-import { UserErrorCodes, UserErrorMessages } from '@core/users/domain/errors';
-import { UsersRepository } from '@core/users/domain/repositories';
-import { User } from '@core/users/domain/user';
+import {
+    CreateUserUseCase,
+    FindUserByEmailQuery,
+    GetUserByIdQuery,
+} from '@core/users/application/use-cases';
+import type { User } from '@core/users/domain/user';
 import { durationToSeconds } from '@libs/config';
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BaseException } from '@shared/error';
 
 import { Identity } from '../../domain/identity';
 import { type TokenPair, TokenService } from '../../domain/ports';
@@ -17,7 +19,9 @@ export class CompleteOAuthLoginUseCase {
     private readonly refreshTtlSeconds: number;
 
     constructor(
-        private readonly users: UsersRepository,
+        private readonly getUserById: GetUserByIdQuery,
+        private readonly findUserByEmail: FindUserByEmailQuery,
+        private readonly createUser: CreateUserUseCase,
         private readonly identities: IdentitiesRepository,
         private readonly sessions: SessionsRepository,
         private readonly tokens: TokenService,
@@ -41,36 +45,21 @@ export class CompleteOAuthLoginUseCase {
             profile.providerUserId,
         );
         if (identity) {
-            return this.requireUser(identity.userId);
+            return this.getUserById.execute(identity.userId);
         }
 
-        const existing = await this.users.findByEmail(profile.email);
+        const existing = await this.findUserByEmail.execute(profile.email);
         if (existing) {
             await this.linkIdentity(existing, profile);
             return existing;
         }
 
-        const user = User.create({
+        const user = await this.createUser.execute({
             email: profile.email,
             name: profile.name,
             avatarUrl: profile.avatarUrl,
         });
-        await this.users.create(user);
         await this.linkIdentity(user, profile);
-        return user;
-    }
-
-    private async requireUser(userId: string): Promise<User> {
-        const user = await this.users.findById(userId);
-        if (!user) {
-            throw new BaseException(
-                {
-                    code: UserErrorCodes.NOT_FOUND,
-                    message: UserErrorMessages[UserErrorCodes.NOT_FOUND],
-                },
-                HttpStatus.NOT_FOUND,
-            );
-        }
         return user;
     }
 

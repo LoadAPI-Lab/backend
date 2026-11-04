@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { BaseException } from '@shared/error';
+import { createErrorFactory } from '@shared/error';
 
 export const OAuthErrorCodes = {
     PROVIDER_NOT_SUPPORTED: 'OAUTH.PROVIDER_NOT_SUPPORTED',
@@ -23,7 +23,7 @@ export const OAuthErrorMessages: Record<OAuthErrorCode, string> = {
     [OAuthErrorCodes.AUTHENTICATION_FAILED]: 'OAuth authentication failed',
 };
 
-const OAUTH_ERROR_STATUSES: Record<OAuthErrorCode, HttpStatus> = {
+export const OAuthErrorStatuses: Record<OAuthErrorCode, HttpStatus> = {
     [OAuthErrorCodes.PROVIDER_NOT_SUPPORTED]: HttpStatus.NOT_FOUND,
     [OAuthErrorCodes.PROVIDER_NOT_CONFIGURED]: HttpStatus.NOT_FOUND,
     [OAuthErrorCodes.STATE_MISMATCH]: HttpStatus.BAD_REQUEST,
@@ -33,5 +33,4 @@ const OAUTH_ERROR_STATUSES: Record<OAuthErrorCode, HttpStatus> = {
     [OAuthErrorCodes.AUTHENTICATION_FAILED]: HttpStatus.BAD_GATEWAY,
 };
 
-export const oauthException = (code: OAuthErrorCode): BaseException =>
-    new BaseException({ code, message: OAuthErrorMessages[code] }, OAUTH_ERROR_STATUSES[code]);
+export const oauthException = createErrorFactory(OAuthErrorMessages, OAuthErrorStatuses);

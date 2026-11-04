@@ -1,4 +1,5 @@
-import { ErrorCode } from '@shared/error';
+import { HttpStatus } from '@nestjs/common';
+import { createErrorFactory, ErrorCode } from '@shared/error';
 
 export const TestRunErrorCodes = {
     ENQUEUE_FAILED: 'TEST_RUN.ENQUEUE_FAILED',
@@ -17,3 +18,13 @@ export const TestRunErrorMessages: Record<TestRunErrorCode, string> = {
     [TestRunErrorCodes.CAPACITY_EXCEEDED]: 'Too many test runs are in progress, try again later',
     [TestRunErrorCodes.INVALID_CURSOR]: 'The pagination cursor is invalid',
 };
+
+export const TestRunErrorStatuses: Record<TestRunErrorCode, HttpStatus> = {
+    [TestRunErrorCodes.ENQUEUE_FAILED]: HttpStatus.SERVICE_UNAVAILABLE,
+    [TestRunErrorCodes.NOT_FOUND]: HttpStatus.NOT_FOUND,
+    [TestRunErrorCodes.ALREADY_FINISHED]: HttpStatus.CONFLICT,
+    [TestRunErrorCodes.CAPACITY_EXCEEDED]: HttpStatus.SERVICE_UNAVAILABLE,
+    [TestRunErrorCodes.INVALID_CURSOR]: HttpStatus.BAD_REQUEST,
+};
+
+export const testRunException = createErrorFactory(TestRunErrorMessages, TestRunErrorStatuses);

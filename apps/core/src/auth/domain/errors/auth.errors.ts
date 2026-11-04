@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { UNAUTHENTICATED_ERROR_CODE, UNAUTHENTICATED_ERROR_MESSAGE } from '@shared/constants';
-import { BaseException } from '@shared/error';
+import { createErrorFactory } from '@shared/error';
 
 export const AuthErrorCodes = {
     UNAUTHENTICATED: UNAUTHENTICATED_ERROR_CODE,
@@ -16,11 +16,10 @@ export const AuthErrorMessages: Record<AuthErrorCode, string> = {
     [AuthErrorCodes.ORIGIN_NOT_ALLOWED]: 'Requests from this origin are not allowed',
 };
 
-const AUTH_ERROR_STATUSES: Record<AuthErrorCode, HttpStatus> = {
+export const AuthErrorStatuses: Record<AuthErrorCode, HttpStatus> = {
     [AuthErrorCodes.UNAUTHENTICATED]: HttpStatus.UNAUTHORIZED,
     [AuthErrorCodes.SESSION_INVALID]: HttpStatus.UNAUTHORIZED,
     [AuthErrorCodes.ORIGIN_NOT_ALLOWED]: HttpStatus.FORBIDDEN,
 };
 
-export const authException = (code: AuthErrorCode): BaseException =>
-    new BaseException({ code, message: AuthErrorMessages[code] }, AUTH_ERROR_STATUSES[code]);
+export const authException = createErrorFactory(AuthErrorMessages, AuthErrorStatuses);

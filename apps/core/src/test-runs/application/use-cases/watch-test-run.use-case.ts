@@ -1,9 +1,8 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
-import { BaseException } from '@shared/error';
+import { Injectable } from '@nestjs/common';
 import { concat, concatMap, defer, finalize, from, type Observable, of, ReplaySubject } from 'rxjs';
 
 import { LiveEventType } from '../../domain/constants';
-import { TestRunErrorCodes, TestRunErrorMessages } from '../../domain/errors';
+import { TestRunErrorCodes, testRunException } from '../../domain/errors';
 import { type LiveEvent, LiveFeed } from '../../domain/ports';
 import { TestRunsRepository } from '../../domain/repositories';
 import type { TestRun } from '../../domain/test-run';
@@ -40,13 +39,7 @@ export class WatchTestRunUseCase {
         const run = await this.repository.findById(id);
 
         if (!run) {
-            throw new BaseException(
-                {
-                    code: TestRunErrorCodes.NOT_FOUND,
-                    message: TestRunErrorMessages[TestRunErrorCodes.NOT_FOUND],
-                },
-                HttpStatus.NOT_FOUND,
-            );
+            throw testRunException(TestRunErrorCodes.NOT_FOUND);
         }
 
         return run;
