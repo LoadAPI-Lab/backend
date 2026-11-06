@@ -1,6 +1,8 @@
 import type { ApiSpecRequestBody } from '../../domain/api-spec-document';
 import { asNode, type DocumentNode, firstDefined, firstExampleValue } from './document-values';
 import { stringifySafely } from './example-text';
+import { resolveReferences } from './json-pointer';
+import { sampleExample } from './sample-example';
 
 const JSON_MEDIA_TYPE = 'application/json';
 const JSON_SUFFIX = '+json';
@@ -68,6 +70,9 @@ const formEncoded = (example: unknown): string | undefined => {
     return params.toString();
 };
 
+const isSampledMediaType = (contentType: string): boolean =>
+    isJsonMediaType(contentType) || essence(contentType) === FORM_MEDIA_TYPE;
+
 const formatExample = (contentType: string, example: unknown): string | undefined => {
     if (example === undefined) {
         return undefined;
@@ -81,7 +86,42 @@ const formatExample = (contentType: string, example: unknown): string | undefine
     return typeof example === 'string' ? example : undefined;
 };
 
-export const normalizeRequestBody = (value: unknown): ApiSpecRequestBody | undefined => {
+export interface RawRequestBody {
+    readonly value: unknown;
+    readonly root: DocumentNode;
+}
+
+const rawSchema = ({ value, root }: RawRequestBody, contentType: string): unknown => {
+    const content = asNode(asNode(resolveReferences(root, value))?.['content']);
+    return asNode(resolveReferences(root, content?.[contentType]))?.['schema'];
+};
+
+const hasExample = (media: DocumentNode): boolean =>
+    media['example'] !== undefined || media['examples'] !== undefined;
+
+const toExample = (
+    contentType: string,
+    media: DocumentNode,
+    raw: RawRequestBody,
+): string | undefined => {
+    if (hasExample(media)) {
+        return formatExample(
+            contentType,
+            firstDefined(media['example'], firstExampleValue(media['examples'])),
+        );
+    }
+    if (!isSampledMediaType(contentType)) {
+        return undefined;
+    }
+    return sampleExample(rawSchema(raw, contentType), raw.root, (value) =>
+        formatExample(contentType, value),
+    );
+};
+
+export const normalizeRequestBody = (
+    value: unknown,
+    raw: RawRequestBody,
+): ApiSpecRequestBody | undefined => {
     const body = asNode(value);
     if (!body) {
         return undefined;
@@ -94,10 +134,7 @@ export const normalizeRequestBody = (value: unknown): ApiSpecRequestBody | undef
     }
 
     const media: DocumentNode = asNode(content[contentType]) ?? {};
-    const example = formatExample(
-        contentType,
-        firstDefined(media['example'], firstExampleValue(media['examples'])),
-    );
+    const example = toExample(contentType, media, raw);
 
     return {
         required: body['required'] === true,

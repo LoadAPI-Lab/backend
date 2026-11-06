@@ -25,6 +25,45 @@ const getOperation = (...lines: string[]): string[] => [
     '          description: OK',
 ];
 
+const COMPONENTS = [
+    'components:',
+    '  schemas:',
+    '    OrderLine:',
+    '      type: object',
+    '      properties:',
+    '        productId: { type: string, format: uuid }',
+    '        quantity: { type: integer }',
+    '    Credentials:',
+    '      type: object',
+    '      properties:',
+    '        a: { type: string, example: text }',
+    '        b: { type: integer, example: 3 }',
+    '    Order:',
+    '      type: object',
+    '      properties:',
+    '        id: { type: string, readOnly: true }',
+    '        note: { type: string }',
+    '    Node:',
+    '      type: object',
+    '      properties:',
+    '        name: { type: string }',
+    '        children:',
+    '          type: array',
+    '          items: { $ref: "#/components/schemas/Node" }',
+];
+
+const withRequestBody = (body: string[]): string =>
+    openapi30(
+        'paths:',
+        '  /orders:',
+        '    post:',
+        '      requestBody:',
+        ...body.map((line) => `        ${line}`),
+        '      responses:',
+        "        '201': { description: Created }",
+        ...COMPONENTS,
+    );
+
 interface ParseFailure {
     readonly status: number;
     readonly code: string;
@@ -526,8 +565,8 @@ describe('SpecParserImpl', () => {
             expected: { required: false, contentType: 'application/xml' },
         },
         {
-            name: 'no example when the spec gives none',
-            body: ['content:', '  application/json:', '    schema: { type: object }'],
+            name: 'no example when the spec gives neither an example nor a schema',
+            body: ['content:', '  application/json: {}'],
             expected: { required: false, contentType: 'application/json' },
         },
     ])('returns the request body with $name', async ({ body, expected }) => {
@@ -544,6 +583,92 @@ describe('SpecParserImpl', () => {
         const endpoint = await firstEndpoint(content);
 
         expect(endpoint.requestBody).toEqual(expected);
+    });
+
+    it.each([
+        {
+            name: 'an explicit example over a generated one',
+            body: [
+                'content:',
+                '  application/json:',
+                '    schema: { $ref: "#/components/schemas/OrderLine" }',
+                '    example: { productId: given, quantity: 5 }',
+            ],
+            expected: '{\n  "productId": "given",\n  "quantity": 5\n}',
+        },
+        {
+            name: 'a form example generated from the schema',
+            body: [
+                'content:',
+                '  application/x-www-form-urlencoded:',
+                '    schema: { $ref: "#/components/schemas/Credentials" }',
+            ],
+            expected: 'a=text&b=3',
+        },
+        {
+            name: 'no generated example for an XML body',
+            body: [
+                'content:',
+                '  application/xml:',
+                '    schema: { $ref: "#/components/schemas/OrderLine" }',
+            ],
+            expected: undefined,
+        },
+    ])('returns $name', async ({ body, expected }) => {
+        const endpoint = await firstEndpoint(withRequestBody(body));
+
+        expect(endpoint.requestBody?.example).toBe(expected);
+    });
+
+    it('generates a pretty-printed JSON example from a referenced schema', async () => {
+        const endpoint = await firstEndpoint(
+            withRequestBody([
+                'content:',
+                '  application/json:',
+                '    schema: { $ref: "#/components/schemas/OrderLine" }',
+            ]),
+        );
+
+        const example = endpoint.requestBody?.example ?? '';
+        const value: unknown = JSON.parse(example);
+
+        expect(example).toBe(JSON.stringify(value, undefined, 2));
+        expect(value).toEqual({
+            productId: expect.stringMatching(
+                /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/,
+            ),
+            quantity: expect.any(Number),
+        });
+    });
+
+    it('leaves read-only properties out of a generated example', async () => {
+        const endpoint = await firstEndpoint(
+            withRequestBody([
+                'content:',
+                '  application/json:',
+                '    schema: { $ref: "#/components/schemas/Order" }',
+            ]),
+        );
+
+        const example: unknown = JSON.parse(endpoint.requestBody?.example ?? '{}');
+
+        expect(example).toEqual({ note: 'string' });
+    });
+
+    it('finishes on a circular schema', async () => {
+        const endpoint = await firstEndpoint(
+            withRequestBody([
+                'content:',
+                '  application/json:',
+                '    schema: { $ref: "#/components/schemas/Node" }',
+            ]),
+        );
+
+        expect(endpoint.requestBody).toMatchObject({ contentType: 'application/json' });
+        const example = endpoint.requestBody?.example;
+        if (example !== undefined) {
+            expect(JSON.parse(example)).toMatchObject({ name: expect.any(String) });
+        }
     });
 
     it('omits the request body when the operation has none', async () => {

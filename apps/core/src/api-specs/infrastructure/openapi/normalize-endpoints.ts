@@ -2,6 +2,7 @@ import type { ApiSpecEndpoint, ApiSpecEndpointResponse } from '../../domain/api-
 import { ApiSpecMethod } from '../../domain/constants';
 import { asNode, asString, type DocumentNode, isExtensionKey } from './document-values';
 import { endpointId } from './endpoint-id';
+import { resolveReferences } from './json-pointer';
 import {
     appendMissingParameters,
     mergeParameters,
@@ -23,6 +24,7 @@ const OPERATION_METHODS: ReadonlyMap<string, ApiSpecMethod> = new Map([
 interface OperationContext {
     readonly path: string;
     readonly pathItem: DocumentNode;
+    readonly root: DocumentNode;
     readonly rootSecurity: unknown;
     readonly securitySchemes: DocumentNode | undefined;
     readonly responseOrder: ResponseOrder;
@@ -63,7 +65,15 @@ const toEndpoint = (
     const key = `${method} ${context.path}`;
     const summary = asString(operation['summary']);
     const description = asString(operation['description']);
-    const requestBody = normalizeRequestBody(operation['requestBody']);
+    const rawPathItem = resolveReferences(
+        context.root,
+        asNode(context.root['paths'])?.[context.path],
+    );
+    const rawOperation = asNode(asNode(rawPathItem)?.[field]);
+    const requestBody = normalizeRequestBody(operation['requestBody'], {
+        value: rawOperation?.['requestBody'],
+        root: context.root,
+    });
     const security =
         operation['security'] === undefined ? context.rootSecurity : operation['security'];
     const parameters = appendMissingParameters(
@@ -95,6 +105,7 @@ const pathEndpoints = (context: OperationContext): ApiSpecEndpoint[] =>
 
 export const normalizeEndpoints = (
     document: DocumentNode,
+    root: DocumentNode,
     responseOrder: ResponseOrder,
 ): ApiSpecEndpoint[] => {
     const securitySchemes = asNode(asNode(document['components'])?.['securitySchemes']);
@@ -106,6 +117,7 @@ export const normalizeEndpoints = (
         return pathEndpoints({
             path,
             pathItem,
+            root,
             rootSecurity: document['security'],
             securitySchemes,
             responseOrder,

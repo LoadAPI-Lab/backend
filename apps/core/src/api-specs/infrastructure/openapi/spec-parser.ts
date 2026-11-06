@@ -73,7 +73,7 @@ export class SpecParserImpl implements SpecParser {
             version: asString(info['version']) ?? '',
             ...(description !== undefined && { description }),
             servers: normalizeServers(document['servers']),
-            endpoints: normalizeEndpoints(document, responseOrder),
+            endpoints: normalizeEndpoints(document, root, responseOrder),
         };
     }
 }
