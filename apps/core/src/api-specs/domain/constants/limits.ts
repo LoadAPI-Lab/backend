@@ -4,3 +4,5 @@ export const ENDPOINT_ID_LENGTH = 10;
 export const DEFAULT_SPEC_NAME = 'Untitled API';
 export const MAX_GENERATED_EXAMPLE_BYTES = 65_536;
 export const MAX_SAMPLE_DEPTH = 6;
+export const MAX_FIELD_DEPTH = 6;
+export const MAX_FIELD_SCHEMA_NODES = 1000;

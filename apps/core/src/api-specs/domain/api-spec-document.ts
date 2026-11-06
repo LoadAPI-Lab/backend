@@ -1,4 +1,4 @@
-import type { ApiSpecMethod, ParameterLocation } from './constants';
+import type { ApiSpecMethod, BodyFieldType, ParameterLocation } from './constants';
 
 export interface ApiSpecServerVariable {
     readonly default: string;
@@ -30,10 +30,18 @@ export interface ApiSpecParameter {
     readonly example?: string;
 }
 
+export interface ApiSpecBodyField {
+    readonly path: string;
+    readonly type: BodyFieldType;
+    readonly format?: string;
+    readonly required: boolean;
+}
+
 export interface ApiSpecRequestBody {
     readonly required: boolean;
     readonly contentType: string;
     readonly example?: string;
+    readonly fields?: ApiSpecBodyField[];
 }
 
 export interface ApiSpecEndpointResponse {

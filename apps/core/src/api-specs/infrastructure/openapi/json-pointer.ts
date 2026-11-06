@@ -41,17 +41,25 @@ const referenceOf = (value: unknown): string | undefined => {
     return reference.slice(INTERNAL_REFERENCE_PREFIX.length);
 };
 
-export const resolveReferences = (root: unknown, value: unknown): unknown => {
-    const visited = new Set<string>();
+export interface ResolvedReference {
+    readonly value: unknown;
+    readonly references: string[];
+}
+
+export const resolveReferenceChain = (root: unknown, value: unknown): ResolvedReference => {
+    const references: string[] = [];
     let current = value;
     let reference = referenceOf(current);
     while (reference !== undefined) {
-        if (visited.has(reference)) {
-            return undefined;
+        if (references.includes(reference)) {
+            return { value: undefined, references };
         }
-        visited.add(reference);
+        references.push(reference);
         current = valueAt(root, reference);
         reference = referenceOf(current);
     }
-    return current;
+    return { value: current, references };
 };
+
+export const resolveReferences = (root: unknown, value: unknown): unknown =>
+    resolveReferenceChain(root, value).value;

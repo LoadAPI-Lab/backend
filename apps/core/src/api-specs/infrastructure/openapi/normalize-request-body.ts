@@ -1,4 +1,5 @@
-import type { ApiSpecRequestBody } from '../../domain/api-spec-document';
+import type { ApiSpecBodyField, ApiSpecRequestBody } from '../../domain/api-spec-document';
+import { collectBodyFields } from './body-fields';
 import { asNode, type DocumentNode, firstDefined, firstExampleValue } from './document-values';
 import { stringifySafely } from './example-text';
 import { resolveReferences } from './json-pointer';
@@ -118,6 +119,9 @@ const toExample = (
     );
 };
 
+const toFields = (contentType: string, raw: RawRequestBody): ApiSpecBodyField[] =>
+    isSampledMediaType(contentType) ? collectBodyFields(rawSchema(raw, contentType), raw.root) : [];
+
 export const normalizeRequestBody = (
     value: unknown,
     raw: RawRequestBody,
@@ -135,10 +139,12 @@ export const normalizeRequestBody = (
 
     const media: DocumentNode = asNode(content[contentType]) ?? {};
     const example = toExample(contentType, media, raw);
+    const fields = toFields(contentType, raw);
 
     return {
         required: body['required'] === true,
         contentType,
         ...(example !== undefined && { example }),
+        ...(fields.length > 0 && { fields }),
     };
 };

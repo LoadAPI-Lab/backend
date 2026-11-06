@@ -1,7 +1,12 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod/v4';
 
-import { API_SPEC_METHODS, NAME_MAX_LENGTH, PARAMETER_LOCATIONS } from '../../domain/constants';
+import {
+    API_SPEC_METHODS,
+    BODY_FIELD_TYPES,
+    NAME_MAX_LENGTH,
+    PARAMETER_LOCATIONS,
+} from '../../domain/constants';
 
 const apiSpecIdSchema = z.uuid().describe('API spec id');
 const nameSchema = z
@@ -75,6 +80,15 @@ const parameterSchema = z.object({
     example: z.string().optional().describe('Example value as text'),
 });
 
+const bodyFieldSchema = z.object({
+    path: z
+        .string()
+        .describe('Field path: property names joined with dots, array items as index 0'),
+    type: z.enum(BODY_FIELD_TYPES).describe('Primitive type of the field'),
+    format: z.string().optional().describe('Schema format, e.g. uuid, email, date-time'),
+    required: z.boolean().describe('Whether the parent object lists the field as required'),
+});
+
 const requestBodySchema = z.object({
     required: z.boolean().describe('Whether the body is required'),
     contentType: z.string().describe('Chosen media type, JSON preferred'),
@@ -82,6 +96,10 @@ const requestBodySchema = z.object({
         .string()
         .optional()
         .describe('Example body as text, present when the spec gives one'),
+    fields: z
+        .array(bodyFieldSchema)
+        .optional()
+        .describe('Leaf fields of a JSON or form body, present when there is at least one'),
 });
 
 const responseSchema = z.object({
