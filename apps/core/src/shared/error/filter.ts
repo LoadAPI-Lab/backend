@@ -135,7 +135,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
             this.formatErrorResponse(request, status, {
                 code: error.code,
                 message: error.message || exception.message,
-                details: this.isDev ? (error.details ?? []) : [],
+                details: this.isClientVisible(status) ? (error.details ?? []) : [],
                 stack: exception.stack,
             }),
         );
@@ -194,6 +194,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
                 stack,
             }),
         );
+    }
+
+    private isClientVisible(status: number): boolean {
+        return this.isDev || status < HttpStatus.INTERNAL_SERVER_ERROR;
     }
 
     private pgLogFields(pgError: PostgresError | undefined): Record<string, unknown> {
