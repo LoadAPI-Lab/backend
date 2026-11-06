@@ -1,7 +1,7 @@
 import { DATABASE_SERVICE, type DatabaseService } from '@libs/database';
 import { Inject, Injectable } from '@nestjs/common';
 import * as schema from '@shared/entities';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, type SQL, sql } from 'drizzle-orm';
 
 import { ACTIVE_STATUSES, type TestRunStatus } from '../../../domain/constants';
 import { TestRunsRepository, type TestRunPageQuery } from '../../../domain/repositories';
@@ -24,15 +24,11 @@ export class TestRunsRepositoryImpl implements TestRunsRepository {
     }
 
     async findById(id: string): Promise<TestRun | undefined> {
-        const [row] = await this.db
-            .select()
-            .from(testRuns)
-            .where(eq(testRuns.id, id))
-            .limit(SINGLE_ROW_LIMIT);
-        if (!row) {
-            return undefined;
-        }
-        return toDomainTestRun(row);
+        return this.findOne(eq(testRuns.id, id));
+    }
+
+    async findByIdForUser(id: string, userId: string): Promise<TestRun | undefined> {
+        return this.findOne(and(eq(testRuns.id, id), eq(testRuns.userId, userId)));
     }
 
     async updateIfStatus(run: TestRun, expected: TestRunStatus): Promise<boolean> {
@@ -63,12 +59,13 @@ export class TestRunsRepositoryImpl implements TestRunsRepository {
         return rows.map(toDomainTestRun);
     }
 
-    async findPage({ limit, cursor, status, type }: TestRunPageQuery): Promise<TestRun[]> {
+    async findPage({ userId, limit, cursor, status, type }: TestRunPageQuery): Promise<TestRun[]> {
         const rows = await this.db
             .select()
             .from(testRuns)
             .where(
                 and(
+                    eq(testRuns.userId, userId),
                     cursor &&
                         sql`(${testRuns.createdAt}, ${testRuns.id}) < (${cursor.createdAt}::timestamptz, ${cursor.id}::uuid)`,
                     status && eq(testRuns.status, status),
@@ -78,5 +75,17 @@ export class TestRunsRepositoryImpl implements TestRunsRepository {
             .orderBy(desc(testRuns.createdAt), desc(testRuns.id))
             .limit(limit + NEXT_PAGE_PROBE_ROWS);
         return rows.map(toDomainTestRun);
+    }
+
+    private async findOne(condition: SQL | undefined): Promise<TestRun | undefined> {
+        const [row] = await this.db
+            .select()
+            .from(testRuns)
+            .where(condition)
+            .limit(SINGLE_ROW_LIMIT);
+        if (!row) {
+            return undefined;
+        }
+        return toDomainTestRun(row);
     }
 }

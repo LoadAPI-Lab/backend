@@ -12,8 +12,8 @@ export class StopTestRunUseCase {
         private readonly stopper: TestRunStopper,
     ) {}
 
-    async execute(id: string): Promise<StopTestRunResponse> {
-        const run = await this.repository.findById(id);
+    async execute(id: string, userId: string): Promise<StopTestRunResponse> {
+        const run = await this.repository.findByIdForUser(id, userId);
 
         if (!run) {
             throw testRunException(TestRunErrorCodes.NOT_FOUND);

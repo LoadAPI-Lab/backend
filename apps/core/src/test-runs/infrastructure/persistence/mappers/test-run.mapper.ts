@@ -8,6 +8,7 @@ type TestRunInsert = typeof testRuns.$inferInsert;
 export function toDomainTestRun(row: TestRunRow): TestRun {
     return TestRun.restore({
         id: row.id,
+        userId: row.userId,
         type: row.type,
         status: row.status,
         config: row.config as SingleConfig | ScenarioConfig,
@@ -22,6 +23,7 @@ export function toDomainTestRun(row: TestRunRow): TestRun {
 export function toTestRunRow(run: TestRun): TestRunInsert {
     return {
         id: run.id,
+        userId: run.userId,
         type: run.type,
         status: run.status,
         config: run.config,

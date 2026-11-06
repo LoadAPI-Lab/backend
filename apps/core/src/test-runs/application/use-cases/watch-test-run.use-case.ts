@@ -14,14 +14,14 @@ export class WatchTestRunUseCase {
         private readonly liveFeed: LiveFeed,
     ) {}
 
-    async execute(id: string): Promise<Observable<LiveEvent>> {
-        await this.loadRun(id);
+    async execute(id: string, userId: string): Promise<Observable<LiveEvent>> {
+        await this.loadRun(id, userId);
 
         return defer(() => {
             const buffer = new ReplaySubject<LiveEvent>();
             const feedSubscription = this.liveFeed.watch(id).subscribe(buffer);
 
-            return from(this.loadRun(id)).pipe(
+            return from(this.loadRun(id, userId)).pipe(
                 concatMap((run) => {
                     const currentStatus = of<LiveEvent>({
                         type: LiveEventType.STATUS,
@@ -35,8 +35,8 @@ export class WatchTestRunUseCase {
         });
     }
 
-    private async loadRun(id: string): Promise<TestRun> {
-        const run = await this.repository.findById(id);
+    private async loadRun(id: string, userId: string): Promise<TestRun> {
+        const run = await this.repository.findByIdForUser(id, userId);
 
         if (!run) {
             throw testRunException(TestRunErrorCodes.NOT_FOUND);

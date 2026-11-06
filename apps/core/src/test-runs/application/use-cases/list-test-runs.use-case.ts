@@ -23,13 +23,12 @@ const decodeCursorOrThrow = (encoded: string): TestRunPageCursor => {
 export class ListTestRunsUseCase {
     constructor(private readonly repository: TestRunsRepository) {}
 
-    async execute({
-        limit,
-        cursor,
-        status,
-        type,
-    }: ListTestRunsQueryDto): Promise<ListTestRunsResponse> {
+    async execute(
+        { limit, cursor, status, type }: ListTestRunsQueryDto,
+        userId: string,
+    ): Promise<ListTestRunsResponse> {
         const runs = await this.repository.findPage({
+            userId,
             limit,
             ...(cursor !== undefined && { cursor: decodeCursorOrThrow(cursor) }),
             ...(status !== undefined && { status }),

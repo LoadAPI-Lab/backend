@@ -7,6 +7,7 @@ const MS_PER_SECOND = 1000;
 
 interface TestRunState {
     readonly id: string;
+    readonly userId: string;
     readonly type: TestType;
     readonly config: TestRunConfig;
     readonly createdAt: Date;
@@ -32,9 +33,10 @@ export const isFinalStatus = (status: TestRunStatus): boolean =>
 export class TestRun {
     private constructor(private readonly state: TestRunState) {}
 
-    static create(input: TestConfigInput & { now?: Date }): TestRun {
+    static create(input: TestConfigInput & { userId: string; now?: Date }): TestRun {
         return new TestRun({
             id: crypto.randomUUID(),
+            userId: input.userId,
             type: input.type,
             config: input.config,
             createdAt: input.now ?? new Date(),
@@ -44,6 +46,7 @@ export class TestRun {
 
     static restore(props: {
         id: string;
+        userId: string;
         type: TestType;
         status: TestRunStatus;
         config: TestRunConfig;
@@ -58,6 +61,10 @@ export class TestRun {
 
     get id(): string {
         return this.state.id;
+    }
+
+    get userId(): string {
+        return this.state.userId;
     }
 
     get type(): TestType {

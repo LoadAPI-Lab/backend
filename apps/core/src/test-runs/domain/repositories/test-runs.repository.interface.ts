@@ -7,6 +7,7 @@ export interface TestRunPageCursor {
 }
 
 export interface TestRunPageQuery {
+    readonly userId: string;
     readonly limit: number;
     readonly cursor?: TestRunPageCursor;
     readonly status?: TestRunStatus;
@@ -16,6 +17,7 @@ export interface TestRunPageQuery {
 export abstract class TestRunsRepository {
     abstract create(run: TestRun): Promise<void>;
     abstract findById(id: string): Promise<TestRun | undefined>;
+    abstract findByIdForUser(id: string, userId: string): Promise<TestRun | undefined>;
     abstract updateIfStatus(run: TestRun, expected: TestRunStatus): Promise<boolean>;
     abstract countActive(): Promise<number>;
     abstract findActive(): Promise<TestRun[]>;

@@ -10,7 +10,8 @@ import {
     Sse,
     UseGuards,
 } from '@nestjs/common';
-import { ApiBaseController, SkipContract } from '@shared/decorators';
+import { ApiBaseController, CurrentUser, SkipContract } from '@shared/decorators';
+import type { AuthenticatedUser } from '@shared/types';
 import { map, type Observable } from 'rxjs';
 
 import {
@@ -50,35 +51,50 @@ export class TestRunsController {
 
     @Post()
     @StartTestRunSwagger()
-    start(@Body() dto: StartTestRunDto): Promise<StartTestRunResponse> {
-        return this.startTestRun.execute(dto);
+    start(
+        @Body() dto: StartTestRunDto,
+        @CurrentUser() user: AuthenticatedUser,
+    ): Promise<StartTestRunResponse> {
+        return this.startTestRun.execute(dto, user.id);
     }
 
     @Get()
     @ListTestRunsSwagger()
-    list(@Query() query: ListTestRunsQueryDto): Promise<ListTestRunsResponse> {
-        return this.listTestRuns.execute(query);
+    list(
+        @Query() query: ListTestRunsQueryDto,
+        @CurrentUser() user: AuthenticatedUser,
+    ): Promise<ListTestRunsResponse> {
+        return this.listTestRuns.execute(query, user.id);
     }
 
     @Get(':id')
     @GetTestRunSwagger()
-    get(@Param() params: TestRunParamsDto): Promise<TestRunResponse> {
-        return this.getTestRun.execute(params.id);
+    get(
+        @Param() params: TestRunParamsDto,
+        @CurrentUser() user: AuthenticatedUser,
+    ): Promise<TestRunResponse> {
+        return this.getTestRun.execute(params.id, user.id);
     }
 
     @Post(':id/stop')
     @HttpCode(HttpStatus.ACCEPTED)
     @StopTestRunSwagger()
-    stop(@Param() params: TestRunParamsDto): Promise<StopTestRunResponse> {
-        return this.stopTestRun.execute(params.id);
+    stop(
+        @Param() params: TestRunParamsDto,
+        @CurrentUser() user: AuthenticatedUser,
+    ): Promise<StopTestRunResponse> {
+        return this.stopTestRun.execute(params.id, user.id);
     }
 
     @Sse(':id/metrics')
     @UseGuards(TestRunExistsGuard)
     @SkipContract()
     @WatchTestRunSwagger()
-    async watch(@Param() params: TestRunParamsDto): Promise<Observable<MessageEvent>> {
-        const events = await this.watchTestRun.execute(params.id);
+    async watch(
+        @Param() params: TestRunParamsDto,
+        @CurrentUser() user: AuthenticatedUser,
+    ): Promise<Observable<MessageEvent>> {
+        const events = await this.watchTestRun.execute(params.id, user.id);
 
         return events.pipe(map(({ type, data }) => ({ type, data: data as object })));
     }

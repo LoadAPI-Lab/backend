@@ -23,13 +23,13 @@ export class StartTestRunUseCase {
         this.maxConcurrentTests = configService.getOrThrow('MAX_CONCURRENT_TESTS');
     }
 
-    async execute(input: TestConfigInput): Promise<StartTestRunResponse> {
+    async execute(input: TestConfigInput, userId: string): Promise<StartTestRunResponse> {
         const activeRuns = await this.repository.countActive();
         if (activeRuns >= this.maxConcurrentTests) {
             throw testRunException(TestRunErrorCodes.CAPACITY_EXCEEDED);
         }
 
-        const run = TestRun.create(input);
+        const run = TestRun.create({ ...input, userId });
         await this.repository.create(run);
 
         try {
