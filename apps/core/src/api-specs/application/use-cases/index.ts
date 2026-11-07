@@ -5,17 +5,20 @@ import { GetApiSpecUseCase } from './get-api-spec.use-case';
 import { ImportApiSpecUseCase } from './import-api-spec.use-case';
 import { ListApiSpecsUseCase } from './list-api-specs.use-case';
 import { RenameApiSpecUseCase } from './rename-api-spec.use-case';
+import { UpdateApiSpecContentUseCase } from './update-api-spec-content.use-case';
 
 export * from './delete-api-spec.use-case';
 export * from './get-api-spec.use-case';
 export * from './import-api-spec.use-case';
 export * from './list-api-specs.use-case';
 export * from './rename-api-spec.use-case';
+export * from './update-api-spec-content.use-case';
 
 export const USE_CASES: Provider[] = [
     ImportApiSpecUseCase,
     ListApiSpecsUseCase,
     GetApiSpecUseCase,
     RenameApiSpecUseCase,
+    UpdateApiSpecContentUseCase,
     DeleteApiSpecUseCase,
 ];

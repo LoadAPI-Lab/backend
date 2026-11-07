@@ -41,7 +41,7 @@ interface FieldSlot {
 const isExhausted = (state: WalkState): boolean => state.visited >= MAX_FIELD_SCHEMA_NODES;
 
 const typeOf = (node: DocumentNode): string | undefined => {
-    const {type} = node;
+    const { type } = node;
     if (Array.isArray(type)) {
         return type.find((item): item is string => typeof item === 'string' && item !== NULL_TYPE);
     }

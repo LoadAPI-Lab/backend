@@ -3,6 +3,18 @@ import type { apiSpecs } from '../models';
 
 type ApiSpecRow = typeof apiSpecs.$inferSelect;
 type ApiSpecInsert = typeof apiSpecs.$inferInsert;
+type ApiSpecContentUpdate = Pick<
+    ApiSpecInsert,
+    | 'name'
+    | 'title'
+    | 'version'
+    | 'description'
+    | 'source'
+    | 'servers'
+    | 'endpoints'
+    | 'endpointsCount'
+    | 'updatedAt'
+>;
 
 export function toDomainApiSpec(row: ApiSpecRow): ApiSpec {
     return ApiSpec.restore({
@@ -33,6 +45,20 @@ export function toApiSpecRow(spec: ApiSpec): ApiSpecInsert {
         endpoints: spec.endpoints,
         endpointsCount: spec.endpointsCount,
         createdAt: spec.createdAt,
+        updatedAt: spec.updatedAt,
+    };
+}
+
+export function toApiSpecContentRow(spec: ApiSpec): ApiSpecContentUpdate {
+    return {
+        name: spec.name,
+        title: spec.title,
+        version: spec.version,
+        description: spec.description ?? null,
+        source: spec.source,
+        servers: spec.servers,
+        endpoints: spec.endpoints,
+        endpointsCount: spec.endpointsCount,
         updatedAt: spec.updatedAt,
     };
 }

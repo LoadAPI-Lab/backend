@@ -5,7 +5,7 @@ import { and, desc, eq } from 'drizzle-orm';
 
 import type { ApiSpec, ApiSpecSummary } from '../../../domain/api-spec';
 import { ApiSpecsRepository, type RenameApiSpecInput } from '../../../domain/repositories';
-import { toApiSpecRow, toDomainApiSpec } from '../mappers';
+import { toApiSpecContentRow, toApiSpecRow, toDomainApiSpec } from '../mappers';
 import { apiSpecs } from '../models';
 
 const SINGLE_ROW_LIMIT = 1;
@@ -62,6 +62,15 @@ export class ApiSpecsRepositoryImpl implements ApiSpecsRepository {
             .where(ownedBy(id, userId))
             .returning(SUMMARY_COLUMNS);
         return row ?? null;
+    }
+
+    async updateContent(spec: ApiSpec): Promise<boolean> {
+        const updated = await this.db
+            .update(apiSpecs)
+            .set(toApiSpecContentRow(spec))
+            .where(ownedBy(spec.id, spec.userId))
+            .returning({ id: apiSpecs.id });
+        return Boolean(updated.length);
     }
 
     async deleteForUser(id: string, userId: string): Promise<boolean> {

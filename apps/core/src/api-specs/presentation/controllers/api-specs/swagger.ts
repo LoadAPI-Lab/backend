@@ -9,6 +9,8 @@ import {
     ApiSpecSummaryResponseDto,
     ImportApiSpecDto,
     RenameApiSpecDto,
+    UpdateApiSpecContentDto,
+    UpdatedApiSpecResponseDto,
 } from '../../../application/dtos';
 import { ApiSpecErrorCodes, ApiSpecErrorMessages } from '../../../domain/errors';
 
@@ -42,6 +44,29 @@ const ApiSpecNotFound = () =>
         `${errorLine(ApiSpecErrorCodes.NOT_FOUND, ApiSpecErrorMessages[ApiSpecErrorCodes.NOT_FOUND])} Also returned for specs of other users.`,
     );
 
+const ApiSpecDocumentInvalid = () =>
+    ApiErrorResponse(
+        HttpStatus.BAD_REQUEST,
+        ApiSpecErrorCodes.INVALID_SYNTAX,
+        IMPORT_BAD_REQUEST_DESCRIPTION,
+        [
+            {
+                field: 'content',
+                message: 'Nested mappings are not allowed in compact mappings',
+                code: 'yaml_syntax',
+                line: 3,
+                column: 10,
+            },
+        ],
+    );
+
+const ApiSpecDocumentTooLarge = () =>
+    ApiErrorResponse(
+        HttpStatus.PAYLOAD_TOO_LARGE,
+        ApiSpecErrorCodes.TOO_LARGE,
+        IMPORT_TOO_LARGE_DESCRIPTION,
+    );
+
 export const ImportApiSpecSwagger = () =>
     applyDecorators(
         ApiOperation({
@@ -55,25 +80,8 @@ export const ImportApiSpecSwagger = () =>
             description: 'The spec was imported',
             type: ApiSpecResponseDto,
         }),
-        ApiErrorResponse(
-            HttpStatus.BAD_REQUEST,
-            ApiSpecErrorCodes.INVALID_SYNTAX,
-            IMPORT_BAD_REQUEST_DESCRIPTION,
-            [
-                {
-                    field: 'content',
-                    message: 'Nested mappings are not allowed in compact mappings',
-                    code: 'yaml_syntax',
-                    line: 3,
-                    column: 10,
-                },
-            ],
-        ),
-        ApiErrorResponse(
-            HttpStatus.PAYLOAD_TOO_LARGE,
-            ApiSpecErrorCodes.TOO_LARGE,
-            IMPORT_TOO_LARGE_DESCRIPTION,
-        ),
+        ApiSpecDocumentInvalid(),
+        ApiSpecDocumentTooLarge(),
         SetMetadata(ZOD_RESPONSE_TOKEN, ApiSpecResponseDto),
     );
 
@@ -124,6 +132,25 @@ export const RenameApiSpecSwagger = () =>
         ApiValidationError(),
         ApiSpecNotFound(),
         SetMetadata(ZOD_RESPONSE_TOKEN, ApiSpecSummaryResponseDto),
+    );
+
+export const UpdateApiSpecContentSwagger = () =>
+    applyDecorators(
+        ApiOperation({
+            summary: 'Replace the content of an API spec',
+            description:
+                'Validates and normalizes a new OpenAPI 3.0 or 3.1 document with the same rules as import and replaces the stored document, servers and endpoints. The id and import time stay the same; the display name changes only when given. On any error nothing is saved and the previous version stays. Returns the spec with a summary of added, changed and removed endpoints; an endpoint counts as changed when its parameters, request body or responses differ. The source text is never returned.',
+        }),
+        ApiBody({ type: UpdateApiSpecContentDto }),
+        ApiResponse({
+            status: HttpStatus.OK,
+            description: 'The spec content was replaced',
+            type: UpdatedApiSpecResponseDto,
+        }),
+        ApiSpecDocumentInvalid(),
+        ApiSpecNotFound(),
+        ApiSpecDocumentTooLarge(),
+        SetMetadata(ZOD_RESPONSE_TOKEN, UpdatedApiSpecResponseDto),
     );
 
 export const DeleteApiSpecSwagger = () =>

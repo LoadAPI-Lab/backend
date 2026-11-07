@@ -1,4 +1,4 @@
-import { Body, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
+import { Body, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Put } from '@nestjs/common';
 import { ApiBaseController, CurrentUser, SkipContract } from '@shared/decorators';
 import { RouteBodyLimit } from '@shared/http';
 import type { AuthenticatedUser } from '@shared/types';
@@ -9,6 +9,8 @@ import {
     type ApiSpecSummaryResponse,
     ImportApiSpecDto,
     RenameApiSpecDto,
+    UpdateApiSpecContentDto,
+    type UpdatedApiSpecResponse,
 } from '../../../application/dtos';
 import {
     DeleteApiSpecUseCase,
@@ -16,6 +18,7 @@ import {
     ImportApiSpecUseCase,
     ListApiSpecsUseCase,
     RenameApiSpecUseCase,
+    UpdateApiSpecContentUseCase,
 } from '../../../application/use-cases';
 import {
     DeleteApiSpecSwagger,
@@ -23,6 +26,7 @@ import {
     ImportApiSpecSwagger,
     ListApiSpecsSwagger,
     RenameApiSpecSwagger,
+    UpdateApiSpecContentSwagger,
 } from './swagger';
 
 const IMPORT_BODY_LIMIT_BYTES = 6_291_456;
@@ -34,6 +38,7 @@ export class ApiSpecsController {
         private readonly listApiSpecs: ListApiSpecsUseCase,
         private readonly getApiSpec: GetApiSpecUseCase,
         private readonly renameApiSpec: RenameApiSpecUseCase,
+        private readonly updateApiSpecContent: UpdateApiSpecContentUseCase,
         private readonly deleteApiSpec: DeleteApiSpecUseCase,
     ) {}
 
@@ -70,6 +75,17 @@ export class ApiSpecsController {
         @CurrentUser() user: AuthenticatedUser,
     ): Promise<ApiSpecSummaryResponse> {
         return this.renameApiSpec.execute(params.id, dto.name, user.id);
+    }
+
+    @Put(':id')
+    @RouteBodyLimit(IMPORT_BODY_LIMIT_BYTES)
+    @UpdateApiSpecContentSwagger()
+    updateContent(
+        @Param() params: ApiSpecParamsDto,
+        @Body() dto: UpdateApiSpecContentDto,
+        @CurrentUser() user: AuthenticatedUser,
+    ): Promise<UpdatedApiSpecResponse> {
+        return this.updateApiSpecContent.execute(params.id, dto, user.id);
     }
 
     @Delete(':id')

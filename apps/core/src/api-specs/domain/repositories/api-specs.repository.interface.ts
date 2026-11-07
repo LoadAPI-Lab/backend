@@ -12,5 +12,6 @@ export abstract class ApiSpecsRepository {
     abstract findByIdForUser(id: string, userId: string): Promise<ApiSpec | null>;
     abstract listForUser(userId: string): Promise<ApiSpecSummary[]>;
     abstract updateName(input: RenameApiSpecInput): Promise<ApiSpecSummary | null>;
+    abstract updateContent(spec: ApiSpec): Promise<boolean>;
     abstract deleteForUser(id: string, userId: string): Promise<boolean>;
 }

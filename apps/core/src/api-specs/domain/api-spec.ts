@@ -7,6 +7,12 @@ export interface NewApiSpecInput extends ParsedApiSpec {
     readonly now?: Date;
 }
 
+export interface ReplaceApiSpecContentInput extends ParsedApiSpec {
+    readonly name?: string;
+    readonly source: string;
+    readonly now?: Date;
+}
+
 interface ApiSpecState {
     readonly id: string;
     readonly userId: string;
@@ -47,6 +53,20 @@ export class ApiSpec {
             endpoints: input.endpoints,
             createdAt: now,
             updatedAt: now,
+        });
+    }
+
+    replaceContent(input: ReplaceApiSpecContentInput): ApiSpec {
+        return new ApiSpec({
+            ...this.state,
+            name: input.name ?? this.state.name,
+            title: input.title,
+            version: input.version,
+            description: input.description,
+            source: input.source,
+            servers: input.servers,
+            endpoints: input.endpoints,
+            updatedAt: input.now ?? new Date(),
         });
     }
 

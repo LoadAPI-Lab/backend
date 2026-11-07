@@ -53,6 +53,10 @@ class FakeApiSpecsRepository implements ApiSpecsRepository {
         return { ...spec.toSummary(), name };
     }
 
+    async updateContent(spec: ApiSpec): Promise<boolean> {
+        return this.owned(spec.id, spec.userId) !== undefined;
+    }
+
     async deleteForUser(id: string, userId: string): Promise<boolean> {
         return this.owned(id, userId) !== undefined;
     }

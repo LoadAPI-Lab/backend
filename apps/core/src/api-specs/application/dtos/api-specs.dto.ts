@@ -34,6 +34,14 @@ const importApiSpecSchema = z.object({
 
 export class ImportApiSpecDto extends createZodDto(importApiSpecSchema) {}
 
+const updateApiSpecContentSchema = importApiSpecSchema.extend({
+    name: nameSchema
+        .optional()
+        .describe('New display name of the spec, the current name is kept when omitted'),
+});
+
+export class UpdateApiSpecContentDto extends createZodDto(updateApiSpecContentSchema) {}
+
 const renameApiSpecSchema = z.object({
     name: nameSchema,
 });
@@ -155,3 +163,27 @@ const apiSpecResponseSchema = z.object({
 export class ApiSpecResponseDto extends createZodDto(apiSpecResponseSchema) {}
 
 export type ApiSpecResponse = z.infer<typeof apiSpecResponseSchema>;
+
+const endpointKeysSchema = z.array(z.string());
+
+const endpointChangesSchema = z
+    .object({
+        added: endpointKeysSchema.describe(
+            'Keys of endpoints only in the new version, in new document order',
+        ),
+        changed: endpointKeysSchema.describe(
+            'Keys of endpoints whose parameters, request body or responses changed, in new document order',
+        ),
+        removed: endpointKeysSchema.describe(
+            'Keys of endpoints only in the previous version, in previous document order',
+        ),
+    })
+    .describe('Endpoint changes compared with the previous version, keys are "METHOD path"');
+
+const updatedApiSpecResponseSchema = apiSpecResponseSchema.extend({
+    changes: endpointChangesSchema,
+});
+
+export class UpdatedApiSpecResponseDto extends createZodDto(updatedApiSpecResponseSchema) {}
+
+export type UpdatedApiSpecResponse = z.infer<typeof updatedApiSpecResponseSchema>;
