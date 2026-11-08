@@ -6,9 +6,15 @@ import {
     MAX_PAGE_LIMIT,
     MIN_PAGE_LIMIT,
     TEST_RUN_STATUSES,
+    HTTP_METHODS,
     TEST_TYPES,
 } from '../../domain/constants';
-import { testConfigSchema, type TestConfigInput } from '../../domain/schemas';
+import {
+    scenarioRunSummarySchema,
+    singleRunSummarySchema,
+    testConfigSchema,
+    type TestConfigInput,
+} from '../../domain/schemas';
 
 const testRunIdSchema = z.uuid().describe('Test run id');
 const testRunStatusSchema = z.enum(TEST_RUN_STATUSES).describe('Test run status');
@@ -34,6 +40,29 @@ export class StartTestRunResponseDto extends createZodDto(startTestRunResponseSc
 
 export type StartTestRunResponse = z.infer<typeof startTestRunResponseSchema>;
 
+const testRunRequestSchema = z
+    .object({
+        method: z.enum(HTTP_METHODS).describe('HTTP method'),
+        url: z.string().describe('URL template as entered by the user'),
+    })
+    .describe('Tested request, present on single runs');
+
+const testRunSummarySchema = z
+    .union([singleRunSummarySchema, scenarioRunSummarySchema])
+    .describe(
+        'Result summary, present on COMPLETED and STOPPED runs. Its shape follows `type`: ' +
+            'single gives the result totals and the metrics of its only target, ' +
+            'scenario gives the stored scenario summary',
+    );
+
+const testRunLoadSchema = z
+    .object({
+        targetRps: z.number().int().describe('Target RPS after ramp-up'),
+        durationSeconds: z.number().int().describe('Test duration in seconds'),
+        rampUpSeconds: z.number().int().optional().describe('Ramp-up duration in seconds'),
+    })
+    .describe('Configured load, present on single runs');
+
 const testRunResponseSchema = z.object({
     id: testRunIdSchema,
     type: testTypeSchema,
@@ -42,12 +71,18 @@ const testRunResponseSchema = z.object({
     startedAt: z.iso.datetime().optional().describe('Start time, ISO 8601'),
     finishedAt: z.iso.datetime().optional().describe('Finish time, ISO 8601'),
     reason: z.string().optional().describe('Failure reason, present on FAILED runs'),
+    request: testRunRequestSchema.optional(),
+    load: testRunLoadSchema.optional(),
+    stepsCount: z.number().int().optional().describe('Number of steps, present on scenario runs'),
+    summary: testRunSummarySchema.optional(),
     result: z.unknown().optional().describe('Final result, absent on FAILED runs'),
 });
 
 export class TestRunResponseDto extends createZodDto(testRunResponseSchema) {}
 
 export type TestRunResponse = z.infer<typeof testRunResponseSchema>;
+
+export type TestRunSummary = z.infer<typeof testRunSummarySchema>;
 
 const listTestRunsQuerySchema = z.object({
     limit: z.coerce

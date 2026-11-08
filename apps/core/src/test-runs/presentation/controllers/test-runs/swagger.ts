@@ -51,7 +51,7 @@ export const ListTestRunsSwagger = () =>
         ApiOperation({
             summary: 'List test runs',
             description:
-                'Returns the run history, newest first, with cursor pagination. Configs and results are never included.',
+                'Returns the run history, newest first, with cursor pagination. Each item has the tested request and load or the steps count, and a result summary. Configs and full results are never included.',
         }),
         ApiResponse({
             status: HttpStatus.OK,
