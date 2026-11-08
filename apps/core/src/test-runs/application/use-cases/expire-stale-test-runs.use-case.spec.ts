@@ -2,17 +2,11 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EMPTY, type Observable } from 'rxjs';
 
-import {
-    CreateTestRunOutcome,
-    HttpMethod,
-    TestRunFailureReason,
-    TestRunStatus,
-    TestType,
-} from '../../domain/constants';
+import { HttpMethod, TestRunFailureReason, TestRunStatus, TestType } from '../../domain/constants';
 import type { LiveEvent, LiveFeed, TestRunStopper } from '../../domain/ports';
-import type { TestRunsRepository } from '../../domain/repositories';
 import type { ScenarioConfig, SingleConfig } from '../../domain/schemas';
 import { TestRun } from '../../domain/test-run';
+import { InMemoryTestRunsRepository } from '../../testing';
 import { ExpireStaleTestRunsUseCase } from './expire-stale-test-runs.use-case';
 
 const FIRST_ID = 'b3f1c2d4-7a1e-4f0b-9c3a-2e8d5f6a7b90';
@@ -79,45 +73,17 @@ const runningScenario = (): TestRun =>
         startedAt: STARTED_AT,
     });
 
-class FakeTestRunsRepository implements TestRunsRepository {
-    active: TestRun[] = [];
-    updates: { id: string; status: TestRunStatus; expected: TestRunStatus }[] = [];
-    rejectUpdates = false;
+class RecordingTestRunsRepository extends InMemoryTestRunsRepository {
+    readonly updates: { id: string; status: TestRunStatus; expected: TestRunStatus }[] = [];
 
-    constructor(private readonly callOrder: string[]) {}
-
-    async create(): Promise<CreateTestRunOutcome> {
-        return CreateTestRunOutcome.CREATED;
+    constructor(private readonly callOrder: string[]) {
+        super();
     }
 
-    async existsActiveWithConfigHash(): Promise<boolean> {
-        return false;
-    }
-
-    async findById(): Promise<TestRun | undefined> {
-        return undefined;
-    }
-
-    async findByIdForUser(): Promise<TestRun | undefined> {
-        return undefined;
-    }
-
-    async updateIfStatus(run: TestRun, expected: TestRunStatus): Promise<boolean> {
+    override async updateIfStatus(run: TestRun, expected: TestRunStatus): Promise<boolean> {
         this.callOrder.push('update');
         this.updates.push({ id: run.id, status: run.status, expected });
-        return !this.rejectUpdates;
-    }
-
-    async countActive(): Promise<number> {
-        return this.active.length;
-    }
-
-    async findActive(): Promise<TestRun[]> {
-        return this.active;
-    }
-
-    async findPage(): Promise<TestRun[]> {
-        return [];
+        return super.updateIfStatus(run, expected);
     }
 }
 
@@ -150,14 +116,14 @@ class FakeLiveFeed implements LiveFeed {
 
 describe('ExpireStaleTestRunsUseCase', () => {
     let callOrder: string[];
-    let repository: FakeTestRunsRepository;
+    let repository: RecordingTestRunsRepository;
     let stopper: FakeTestRunStopper;
     let liveFeed: FakeLiveFeed;
     let useCase: ExpireStaleTestRunsUseCase;
 
     beforeEach(() => {
         callOrder = [];
-        repository = new FakeTestRunsRepository(callOrder);
+        repository = new RecordingTestRunsRepository(callOrder);
         stopper = new FakeTestRunStopper(callOrder);
         liveFeed = new FakeLiveFeed();
         useCase = new ExpireStaleTestRunsUseCase(
@@ -177,7 +143,7 @@ describe('ExpireStaleTestRunsUseCase', () => {
     });
 
     it('leaves a pending run within the timeout untouched', async () => {
-        repository.active = [pendingRun()];
+        repository.seed(pendingRun());
 
         await expect(useCase.execute(after(CREATED_AT, PENDING_TIMEOUT_MS))).resolves.toBe(0);
 
@@ -187,8 +153,7 @@ describe('ExpireStaleTestRunsUseCase', () => {
     });
 
     it('fails a pending run past the timeout and requests a stop first', async () => {
-        const run = pendingRun();
-        repository.active = [run];
+        repository.seed(pendingRun());
         const now = after(CREATED_AT, PENDING_TIMEOUT_MS + JUST_OVER_MS);
 
         await expect(useCase.execute(now)).resolves.toBe(1);
@@ -198,8 +163,9 @@ describe('ExpireStaleTestRunsUseCase', () => {
         expect(repository.updates).toEqual([
             { id: FIRST_ID, status: TestRunStatus.FAILED, expected: TestRunStatus.PENDING },
         ]);
-        expect(run.reason).toBe(TestRunFailureReason.NO_WORKER);
-        expect(run.finishedAt).toEqual(now);
+        const run = await repository.findById(FIRST_ID);
+        expect(run?.reason).toBe(TestRunFailureReason.NO_WORKER);
+        expect(run?.finishedAt).toEqual(now);
         expect(liveFeed.published).toEqual([
             {
                 testId: FIRST_ID,
@@ -210,7 +176,7 @@ describe('ExpireStaleTestRunsUseCase', () => {
     });
 
     it('leaves a running single test within duration, timeout and grace untouched', async () => {
-        repository.active = [runningSingle()];
+        repository.seed(runningSingle());
 
         await expect(useCase.execute(after(STARTED_AT, SINGLE_MAX_RUNNING_MS))).resolves.toBe(0);
 
@@ -219,8 +185,7 @@ describe('ExpireStaleTestRunsUseCase', () => {
     });
 
     it('fails a running single test past duration, timeout and grace', async () => {
-        const run = runningSingle();
-        repository.active = [run];
+        repository.seed(runningSingle());
         const now = after(STARTED_AT, SINGLE_MAX_RUNNING_MS + JUST_OVER_MS);
 
         await expect(useCase.execute(now)).resolves.toBe(1);
@@ -229,11 +194,12 @@ describe('ExpireStaleTestRunsUseCase', () => {
         expect(repository.updates).toEqual([
             { id: FIRST_ID, status: TestRunStatus.FAILED, expected: TestRunStatus.RUNNING },
         ]);
-        expect(run.reason).toBe(TestRunFailureReason.RESULT_NOT_REPORTED);
+        const run = await repository.findById(FIRST_ID);
+        expect(run?.reason).toBe(TestRunFailureReason.RESULT_NOT_REPORTED);
     });
 
     it('limits a scenario by steps times the request timeout plus grace', async () => {
-        repository.active = [runningScenario()];
+        repository.seed(runningScenario());
 
         await expect(useCase.execute(after(STARTED_AT, SCENARIO_MAX_RUNNING_MS))).resolves.toBe(0);
         expect(stopper.stopped).toEqual([]);
@@ -245,7 +211,7 @@ describe('ExpireStaleTestRunsUseCase', () => {
     });
 
     it('publishes nothing when the consumer finished the run first', async () => {
-        repository.active = [pendingRun()];
+        repository.seed(pendingRun());
         repository.rejectUpdates = true;
 
         await expect(
@@ -257,7 +223,7 @@ describe('ExpireStaleTestRunsUseCase', () => {
 
     it('keeps expiring the other runs when one throws, without logging error details', async () => {
         const logError = vi.spyOn(Logger.prototype, 'error').mockReturnValue();
-        repository.active = [pendingRun(FIRST_ID), pendingRun(SECOND_ID)];
+        repository.seed(pendingRun(FIRST_ID), pendingRun(SECOND_ID));
         stopper.failingIds.add(FIRST_ID);
 
         await expect(

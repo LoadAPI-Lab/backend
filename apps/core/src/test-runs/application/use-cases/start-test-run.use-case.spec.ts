@@ -5,12 +5,13 @@ import { hashTestConfig } from '../../domain/config-hash';
 import { CreateTestRunOutcome, HttpMethod, TestRunStatus, TestType } from '../../domain/constants';
 import { TestRunErrorCodes } from '../../domain/errors';
 import type { TestJob, WorkerOrchestrator } from '../../domain/ports';
-import type { TestRunsRepository } from '../../domain/repositories';
 import type { TestConfigInput } from '../../domain/schemas';
 import { TestRun } from '../../domain/test-run';
+import { InMemoryTestRunsRepository } from '../../testing';
 import { StartTestRunUseCase } from './start-test-run.use-case';
 
 const OWNER_ID = '5d7e9a10-3c4b-4e2f-8a1d-6b9c0e2f4a13';
+const OTHER_USER_ID = 'e1a2b3c4-5d6e-4f70-8a9b-0c1d2e3f4a5b';
 const MAX_CONCURRENT_TESTS = 2;
 
 const input: TestConfigInput = {
@@ -22,10 +23,10 @@ const input: TestConfigInput = {
     },
 };
 
-const storedRun = (status: TestRunStatus): TestRun =>
+const storedRun = (status: TestRunStatus, userId = OWNER_ID): TestRun =>
     TestRun.restore({
         id: crypto.randomUUID(),
-        userId: OWNER_ID,
+        userId,
         type: input.type,
         status,
         config: input.config,
@@ -33,51 +34,15 @@ const storedRun = (status: TestRunStatus): TestRun =>
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
     });
 
-class FakeTestRunsRepository implements TestRunsRepository {
-    created: TestRun[] = [];
-    activeCount = 0;
-    createOutcome: CreateTestRunOutcome = CreateTestRunOutcome.CREATED;
+class RecordingTestRunsRepository extends InMemoryTestRunsRepository {
+    readonly created: TestRun[] = [];
 
-    constructor(private readonly stored: TestRun[] = []) {}
-
-    async create(run: TestRun): Promise<CreateTestRunOutcome> {
-        if (this.createOutcome === CreateTestRunOutcome.CREATED) {
+    override async create(run: TestRun): Promise<CreateTestRunOutcome> {
+        const outcome = await super.create(run);
+        if (outcome === CreateTestRunOutcome.CREATED) {
             this.created.push(run);
         }
-        return this.createOutcome;
-    }
-
-    async existsActiveWithConfigHash(userId: string, configHash: string): Promise<boolean> {
-        return this.stored.some(
-            (run) =>
-                run.userId === userId &&
-                run.configHash === configHash &&
-                (run.status === TestRunStatus.PENDING || run.status === TestRunStatus.RUNNING),
-        );
-    }
-
-    async findById(): Promise<TestRun | undefined> {
-        return undefined;
-    }
-
-    async findByIdForUser(): Promise<TestRun | undefined> {
-        return undefined;
-    }
-
-    async updateIfStatus(): Promise<boolean> {
-        return true;
-    }
-
-    async countActive(): Promise<number> {
-        return this.activeCount;
-    }
-
-    async findActive(): Promise<TestRun[]> {
-        return [];
-    }
-
-    async findPage(): Promise<TestRun[]> {
-        return [];
+        return outcome;
     }
 }
 
@@ -99,7 +64,7 @@ const isDuplicateActive = (error: unknown) =>
 describe('StartTestRunUseCase', () => {
     let orchestrator: FakeWorkerOrchestrator;
 
-    const useCaseWith = (repository: TestRunsRepository) =>
+    const useCaseWith = (repository: InMemoryTestRunsRepository) =>
         new StartTestRunUseCase(repository, orchestrator, configService);
 
     beforeEach(() => {
@@ -107,8 +72,12 @@ describe('StartTestRunUseCase', () => {
     });
 
     it('rejects an active duplicate before the capacity check and creates nothing', async () => {
-        const repository = new FakeTestRunsRepository([storedRun(TestRunStatus.RUNNING)]);
-        repository.activeCount = MAX_CONCURRENT_TESTS;
+        const repository = new RecordingTestRunsRepository().seed(
+            storedRun(TestRunStatus.RUNNING),
+            ...Array.from({ length: MAX_CONCURRENT_TESTS - 1 }, () =>
+                storedRun(TestRunStatus.PENDING, OTHER_USER_ID),
+            ),
+        );
 
         await expect(useCaseWith(repository).execute(input, OWNER_ID)).rejects.toSatisfy(
             isDuplicateActive,
@@ -119,8 +88,8 @@ describe('StartTestRunUseCase', () => {
     });
 
     it('rejects a run whose insert violates the active config uniqueness and enqueues nothing', async () => {
-        const repository = new FakeTestRunsRepository();
-        repository.createOutcome = CreateTestRunOutcome.DUPLICATE_ACTIVE;
+        const repository = new RecordingTestRunsRepository();
+        repository.rejectCreatesAsDuplicate = true;
 
         await expect(useCaseWith(repository).execute(input, OWNER_ID)).rejects.toSatisfy(
             isDuplicateActive,
@@ -130,7 +99,9 @@ describe('StartTestRunUseCase', () => {
     });
 
     it('allows the same config after the previous run finished', async () => {
-        const repository = new FakeTestRunsRepository([storedRun(TestRunStatus.COMPLETED)]);
+        const repository = new RecordingTestRunsRepository().seed(
+            storedRun(TestRunStatus.COMPLETED),
+        );
 
         const response = await useCaseWith(repository).execute(input, OWNER_ID);
 

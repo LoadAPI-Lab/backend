@@ -4,9 +4,9 @@ import { isBaseExceptionWithCode } from '@shared/error';
 import { CreateTestRunOutcome, HttpMethod, TestRunStatus, TestType } from '../../domain/constants';
 import { TestRunErrorCodes } from '../../domain/errors';
 import type { TestJob, WorkerOrchestrator } from '../../domain/ports';
-import type { TestRunsRepository } from '../../domain/repositories';
 import type { SingleConfig } from '../../domain/schemas';
 import { TestRun } from '../../domain/test-run';
+import { InMemoryTestRunsRepository } from '../../testing';
 import { RerunTestRunUseCase } from './rerun-test-run.use-case';
 import { StartTestRunUseCase } from './start-test-run.use-case';
 
@@ -37,42 +37,15 @@ const storedRun = (): TestRun =>
         result: {},
     });
 
-class FakeTestRunsRepository implements TestRunsRepository {
-    created: TestRun[] = [];
+class RecordingTestRunsRepository extends InMemoryTestRunsRepository {
+    readonly created: TestRun[] = [];
 
-    constructor(private readonly stored: TestRun) {}
-
-    async create(run: TestRun): Promise<CreateTestRunOutcome> {
-        this.created.push(run);
-        return CreateTestRunOutcome.CREATED;
-    }
-
-    async existsActiveWithConfigHash(): Promise<boolean> {
-        return false;
-    }
-
-    async findById(id: string): Promise<TestRun | undefined> {
-        return [this.stored].find((run) => run.id === id);
-    }
-
-    async findByIdForUser(id: string, userId: string): Promise<TestRun | undefined> {
-        return [this.stored].find((run) => run.id === id && run.userId === userId);
-    }
-
-    async updateIfStatus(): Promise<boolean> {
-        return true;
-    }
-
-    async countActive(): Promise<number> {
-        return 0;
-    }
-
-    async findActive(): Promise<TestRun[]> {
-        return [];
-    }
-
-    async findPage(): Promise<TestRun[]> {
-        return [];
+    override async create(run: TestRun): Promise<CreateTestRunOutcome> {
+        const outcome = await super.create(run);
+        if (outcome === CreateTestRunOutcome.CREATED) {
+            this.created.push(run);
+        }
+        return outcome;
     }
 }
 
@@ -91,12 +64,12 @@ const configService = {
 const isNotFound = (error: unknown) => isBaseExceptionWithCode(error, TestRunErrorCodes.NOT_FOUND);
 
 describe('RerunTestRunUseCase', () => {
-    let repository: FakeTestRunsRepository;
+    let repository: RecordingTestRunsRepository;
     let orchestrator: FakeWorkerOrchestrator;
     let useCase: RerunTestRunUseCase;
 
     beforeEach(() => {
-        repository = new FakeTestRunsRepository(storedRun());
+        repository = new RecordingTestRunsRepository().seed(storedRun());
         orchestrator = new FakeWorkerOrchestrator();
         useCase = new RerunTestRunUseCase(
             repository,

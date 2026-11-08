@@ -2,17 +2,11 @@ import { HttpStatus } from '@nestjs/common';
 import { BaseException } from '@shared/error';
 import { firstValueFrom, type Observable, Subject, toArray } from 'rxjs';
 
-import {
-    CreateTestRunOutcome,
-    HttpMethod,
-    LiveEventType,
-    TestRunStatus,
-    TestType,
-} from '../../domain/constants';
+import { HttpMethod, LiveEventType, TestRunStatus, TestType } from '../../domain/constants';
 import { TestRunErrorCodes } from '../../domain/errors';
 import type { LiveEvent, LiveFeed } from '../../domain/ports';
-import { TestRunsRepository } from '../../domain/repositories';
 import { TestRun } from '../../domain/test-run';
+import { InMemoryTestRunsRepository } from '../../testing';
 import { WatchTestRunUseCase } from './watch-test-run.use-case';
 
 const TEST_ID = 'b3f1c2d4-7a1e-4f0b-9c3a-2e8d5f6a7b90';
@@ -46,48 +40,19 @@ const statusEvent = (status: TestRunStatus, reason?: string): LiveEvent => ({
 
 const snapshotEvent = (data: unknown): LiveEvent => ({ type: LiveEventType.SNAPSHOT, data });
 
-class FakeTestRunsRepository implements TestRunsRepository {
-    stored?: TestRun;
+class DelayedSecondReadTestRunsRepository extends InMemoryTestRunsRepository {
     pendingRead?: Promise<void>;
     reads = 0;
 
-    async create(): Promise<CreateTestRunOutcome> {
-        return CreateTestRunOutcome.CREATED;
-    }
-
-    async existsActiveWithConfigHash(): Promise<boolean> {
-        return false;
-    }
-
-    async findById(): Promise<TestRun | undefined> {
-        return undefined;
-    }
-
-    async findByIdForUser(id: string, userId: string): Promise<TestRun | undefined> {
+    override async findByIdForUser(id: string, userId: string): Promise<TestRun | null> {
         this.reads += 1;
-        const captured = [this.stored].find((run) => run?.id === id && run.userId === userId);
+        const captured = super.findByIdForUser(id, userId);
 
         if (this.reads > 1) {
             await this.pendingRead;
         }
 
         return captured;
-    }
-
-    async updateIfStatus(): Promise<boolean> {
-        return false;
-    }
-
-    async countActive(): Promise<number> {
-        return 0;
-    }
-
-    async findActive(): Promise<TestRun[]> {
-        return [];
-    }
-
-    async findPage(): Promise<TestRun[]> {
-        return [];
     }
 }
 
@@ -117,18 +82,18 @@ const flushMicrotasks = (): Promise<void> =>
     });
 
 describe('WatchTestRunUseCase', () => {
-    let repository: FakeTestRunsRepository;
+    let repository: DelayedSecondReadTestRunsRepository;
     let liveFeed: FakeLiveFeed;
     let useCase: WatchTestRunUseCase;
 
     beforeEach(() => {
-        repository = new FakeTestRunsRepository();
+        repository = new DelayedSecondReadTestRunsRepository();
         liveFeed = new FakeLiveFeed();
         useCase = new WatchTestRunUseCase(repository, liveFeed);
     });
 
     it('rejects an unknown id before returning a stream', async () => {
-        repository.stored = restoreRun(TestRunStatus.RUNNING);
+        repository.seed(restoreRun(TestRunStatus.RUNNING));
 
         const rejection = await useCase
             .execute(UNKNOWN_TEST_ID, OWNER_ID)
@@ -141,7 +106,7 @@ describe('WatchTestRunUseCase', () => {
     });
 
     it("rejects another user's run as not found before returning a stream", async () => {
-        repository.stored = restoreRun(TestRunStatus.RUNNING);
+        repository.seed(restoreRun(TestRunStatus.RUNNING));
 
         const rejection = await useCase
             .execute(TEST_ID, OTHER_USER_ID)
@@ -155,7 +120,7 @@ describe('WatchTestRunUseCase', () => {
     });
 
     it('emits one status event and completes for a final run', async () => {
-        repository.stored = restoreRun(TestRunStatus.FAILED, FAILURE_REASON);
+        repository.seed(restoreRun(TestRunStatus.FAILED, FAILURE_REASON));
 
         const events = await collect(await useCase.execute(TEST_ID, OWNER_ID));
 
@@ -163,7 +128,7 @@ describe('WatchTestRunUseCase', () => {
     });
 
     it('emits the status, then snapshots, and completes on a final status', async () => {
-        repository.stored = restoreRun(TestRunStatus.RUNNING);
+        repository.seed(restoreRun(TestRunStatus.RUNNING));
 
         const collected = collect(await useCase.execute(TEST_ID, OWNER_ID));
         await flushMicrotasks();
@@ -180,7 +145,7 @@ describe('WatchTestRunUseCase', () => {
     });
 
     it('completes when a final status is published during the second read', async () => {
-        repository.stored = restoreRun(TestRunStatus.RUNNING);
+        repository.seed(restoreRun(TestRunStatus.RUNNING));
         let finishSecondRead = (): void => undefined;
         repository.pendingRead = new Promise((resolve) => {
             finishSecondRead = resolve;
@@ -198,7 +163,7 @@ describe('WatchTestRunUseCase', () => {
     });
 
     it('stops watching the feed when the stream ends', async () => {
-        repository.stored = restoreRun(TestRunStatus.COMPLETED);
+        repository.seed(restoreRun(TestRunStatus.COMPLETED));
 
         await collect(await useCase.execute(TEST_ID, OWNER_ID));
 

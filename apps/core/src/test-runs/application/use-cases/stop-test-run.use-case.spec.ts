@@ -1,10 +1,10 @@
 import { isBaseExceptionWithCode } from '@shared/error';
 
-import { CreateTestRunOutcome, HttpMethod, TestRunStatus, TestType } from '../../domain/constants';
+import { HttpMethod, TestRunStatus, TestType } from '../../domain/constants';
 import { TestRunErrorCodes } from '../../domain/errors';
 import type { TestRunStopper } from '../../domain/ports';
-import type { TestRunsRepository } from '../../domain/repositories';
 import { TestRun } from '../../domain/test-run';
+import { InMemoryTestRunsRepository } from '../../testing';
 import { StopTestRunUseCase } from './stop-test-run.use-case';
 
 const TEST_ID = 'b3f1c2d4-7a1e-4f0b-9c3a-2e8d5f6a7b90';
@@ -26,42 +26,6 @@ const storedRun = (): TestRun =>
         startedAt: new Date('2026-01-01T00:01:00.000Z'),
     });
 
-class FakeTestRunsRepository implements TestRunsRepository {
-    constructor(private readonly stored: TestRun) {}
-
-    async create(): Promise<CreateTestRunOutcome> {
-        return CreateTestRunOutcome.CREATED;
-    }
-
-    async existsActiveWithConfigHash(): Promise<boolean> {
-        return false;
-    }
-
-    async findById(id: string): Promise<TestRun | undefined> {
-        return [this.stored].find((run) => run.id === id);
-    }
-
-    async findByIdForUser(id: string, userId: string): Promise<TestRun | undefined> {
-        return [this.stored].find((run) => run.id === id && run.userId === userId);
-    }
-
-    async updateIfStatus(): Promise<boolean> {
-        return false;
-    }
-
-    async countActive(): Promise<number> {
-        return 0;
-    }
-
-    async findActive(): Promise<TestRun[]> {
-        return [];
-    }
-
-    async findPage(): Promise<TestRun[]> {
-        return [];
-    }
-}
-
 class FakeTestRunStopper implements TestRunStopper {
     stopped: string[] = [];
 
@@ -78,7 +42,10 @@ describe('StopTestRunUseCase', () => {
 
     beforeEach(() => {
         stopper = new FakeTestRunStopper();
-        useCase = new StopTestRunUseCase(new FakeTestRunsRepository(storedRun()), stopper);
+        useCase = new StopTestRunUseCase(
+            new InMemoryTestRunsRepository().seed(storedRun()),
+            stopper,
+        );
     });
 
     it("requests a stop of the owner's run", async () => {

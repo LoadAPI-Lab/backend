@@ -17,8 +17,8 @@ export interface TestRunPageQuery {
 export abstract class TestRunsRepository {
     abstract create(run: TestRun): Promise<CreateTestRunOutcome>;
     abstract existsActiveWithConfigHash(userId: string, configHash: string): Promise<boolean>;
-    abstract findById(id: string): Promise<TestRun | undefined>;
-    abstract findByIdForUser(id: string, userId: string): Promise<TestRun | undefined>;
+    abstract findById(id: string): Promise<TestRun | null>;
+    abstract findByIdForUser(id: string, userId: string): Promise<TestRun | null>;
     abstract updateIfStatus(run: TestRun, expected: TestRunStatus): Promise<boolean>;
     abstract countActive(): Promise<number>;
     abstract findActive(): Promise<TestRun[]>;

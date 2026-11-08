@@ -65,11 +65,11 @@ export class TestRunsRepositoryImpl implements TestRunsRepository {
         return row !== undefined;
     }
 
-    async findById(id: string): Promise<TestRun | undefined> {
+    async findById(id: string): Promise<TestRun | null> {
         return this.findOne(eq(testRuns.id, id));
     }
 
-    async findByIdForUser(id: string, userId: string): Promise<TestRun | undefined> {
+    async findByIdForUser(id: string, userId: string): Promise<TestRun | null> {
         return this.findOne(and(eq(testRuns.id, id), eq(testRuns.userId, userId)));
     }
 
@@ -119,14 +119,14 @@ export class TestRunsRepositoryImpl implements TestRunsRepository {
         return rows.map(toDomainTestRun);
     }
 
-    private async findOne(condition: SQL | undefined): Promise<TestRun | undefined> {
+    private async findOne(condition: SQL | undefined): Promise<TestRun | null> {
         const [row] = await this.db
             .select()
             .from(testRuns)
             .where(condition)
             .limit(SINGLE_ROW_LIMIT);
         if (!row) {
-            return undefined;
+            return null;
         }
         return toDomainTestRun(row);
     }

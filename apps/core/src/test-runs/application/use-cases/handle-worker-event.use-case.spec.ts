@@ -1,16 +1,10 @@
 import { EMPTY } from 'rxjs';
 
-import {
-    CreateTestRunOutcome,
-    HttpMethod,
-    TestRunStatus,
-    TestType,
-    WorkerEventType,
-} from '../../domain/constants';
+import { HttpMethod, TestRunStatus, TestType, WorkerEventType } from '../../domain/constants';
 import type { LiveFeed } from '../../domain/ports';
-import { TestRunsRepository } from '../../domain/repositories';
 import type { SingleConfig } from '../../domain/schemas';
 import { TestRun } from '../../domain/test-run';
+import { InMemoryTestRunsRepository } from '../../testing';
 import type { FinishedEvent, StartedEvent } from '../dtos';
 import { HandleWorkerEventUseCase, WorkerEventOutcome } from './handle-worker-event.use-case';
 
@@ -69,65 +63,6 @@ function restoreRun(status: TestRunStatus, result?: unknown): TestRun {
     });
 }
 
-class InMemoryTestRunsRepository implements TestRunsRepository {
-    stored?: TestRun;
-    rejectUpdates = false;
-
-    async create(run: TestRun): Promise<CreateTestRunOutcome> {
-        this.stored = run;
-        return CreateTestRunOutcome.CREATED;
-    }
-
-    async existsActiveWithConfigHash(): Promise<boolean> {
-        return false;
-    }
-
-    async findById(id: string): Promise<TestRun | undefined> {
-        if (this.stored?.id !== id) {
-            return undefined;
-        }
-
-        return TestRun.restore({
-            id: this.stored.id,
-            userId: this.stored.userId,
-            type: this.stored.type,
-            status: this.stored.status,
-            config: this.stored.config,
-            createdAt: this.stored.createdAt,
-            reason: this.stored.reason,
-            result: this.stored.result,
-            startedAt: this.stored.startedAt,
-            finishedAt: this.stored.finishedAt,
-        });
-    }
-
-    async findByIdForUser(id: string, userId: string): Promise<TestRun | undefined> {
-        const run = await this.findById(id);
-        return [run].find((candidate) => candidate?.userId === userId);
-    }
-
-    async updateIfStatus(run: TestRun, expected: TestRunStatus): Promise<boolean> {
-        if (this.rejectUpdates || this.stored?.status !== expected) {
-            return false;
-        }
-
-        this.stored = run;
-        return true;
-    }
-
-    async countActive(): Promise<number> {
-        return 0;
-    }
-
-    async findActive(): Promise<TestRun[]> {
-        return [];
-    }
-
-    async findPage(): Promise<TestRun[]> {
-        return [];
-    }
-}
-
 const noopLiveFeed: LiveFeed = {
     watch: () => EMPTY,
     publishStatus: vi.fn(),
@@ -143,67 +78,74 @@ describe('HandleWorkerEventUseCase', () => {
     });
 
     it('applies started on a PENDING run and moves it to RUNNING', async () => {
-        repository.stored = restoreRun(TestRunStatus.PENDING);
+        repository.seed(restoreRun(TestRunStatus.PENDING));
 
         await expect(useCase.execute(STARTED_EVENT)).resolves.toBe(WorkerEventOutcome.APPLIED);
 
-        expect(repository.stored?.status).toBe(TestRunStatus.RUNNING);
-        expect(repository.stored?.startedAt).toEqual(EVENT_STARTED_AT);
+        const stored = await repository.findById(TEST_ID);
+        expect(stored?.status).toBe(TestRunStatus.RUNNING);
+        expect(stored?.startedAt).toEqual(EVENT_STARTED_AT);
     });
 
     it('ignores a duplicate started', async () => {
-        repository.stored = restoreRun(TestRunStatus.PENDING);
+        repository.seed(restoreRun(TestRunStatus.PENDING));
         await useCase.execute(STARTED_EVENT);
 
         await expect(useCase.execute(STARTED_EVENT)).resolves.toBe(WorkerEventOutcome.IGNORED);
 
-        expect(repository.stored?.status).toBe(TestRunStatus.RUNNING);
+        const stored = await repository.findById(TEST_ID);
+        expect(stored?.status).toBe(TestRunStatus.RUNNING);
     });
 
     it('ignores started after FAILED', async () => {
-        repository.stored = restoreRun(TestRunStatus.FAILED);
+        repository.seed(restoreRun(TestRunStatus.FAILED));
 
         await expect(useCase.execute(STARTED_EVENT)).resolves.toBe(WorkerEventOutcome.IGNORED);
 
-        expect(repository.stored?.status).toBe(TestRunStatus.FAILED);
+        const stored = await repository.findById(TEST_ID);
+        expect(stored?.status).toBe(TestRunStatus.FAILED);
     });
 
     it('applies finished COMPLETED from RUNNING and stores the result', async () => {
-        repository.stored = restoreRun(TestRunStatus.RUNNING);
+        repository.seed(restoreRun(TestRunStatus.RUNNING));
 
         await expect(useCase.execute(COMPLETED_EVENT)).resolves.toBe(WorkerEventOutcome.APPLIED);
 
-        expect(repository.stored?.status).toBe(TestRunStatus.COMPLETED);
-        expect(repository.stored?.result).toEqual(RESULT);
-        expect(repository.stored?.finishedAt).toEqual(FINISHED_AT);
+        const stored = await repository.findById(TEST_ID);
+        expect(stored?.status).toBe(TestRunStatus.COMPLETED);
+        expect(stored?.result).toEqual(RESULT);
+        expect(stored?.finishedAt).toEqual(FINISHED_AT);
     });
 
     it('applies finished from PENDING and takes startedAt from the event', async () => {
-        repository.stored = restoreRun(TestRunStatus.PENDING);
+        repository.seed(restoreRun(TestRunStatus.PENDING));
 
         await expect(useCase.execute(COMPLETED_EVENT)).resolves.toBe(WorkerEventOutcome.APPLIED);
 
-        expect(repository.stored?.status).toBe(TestRunStatus.COMPLETED);
-        expect(repository.stored?.startedAt).toEqual(EVENT_STARTED_AT);
+        const stored = await repository.findById(TEST_ID);
+        expect(stored?.status).toBe(TestRunStatus.COMPLETED);
+        expect(stored?.startedAt).toEqual(EVENT_STARTED_AT);
     });
 
     it('ignores finished after a final status and keeps the result', async () => {
         const storedResult = { durationMs: 1 };
-        repository.stored = restoreRun(TestRunStatus.COMPLETED, storedResult);
+        repository.seed(restoreRun(TestRunStatus.COMPLETED, storedResult));
 
         await expect(useCase.execute(COMPLETED_EVENT)).resolves.toBe(WorkerEventOutcome.IGNORED);
 
-        expect(repository.stored?.status).toBe(TestRunStatus.COMPLETED);
-        expect(repository.stored?.result).toEqual(storedResult);
+        const stored = await repository.findById(TEST_ID);
+        expect(stored?.status).toBe(TestRunStatus.COMPLETED);
+        expect(stored?.result).toEqual(storedResult);
     });
 
     it('keeps the reason of a FAILED event', async () => {
-        repository.stored = restoreRun(TestRunStatus.RUNNING);
+        repository.seed(restoreRun(TestRunStatus.RUNNING));
 
         await expect(useCase.execute(FAILED_EVENT)).resolves.toBe(WorkerEventOutcome.APPLIED);
 
-        expect(repository.stored?.status).toBe(TestRunStatus.FAILED);
-        expect(repository.stored?.reason).toBe('bad config');
+        const stored = await repository.findById(TEST_ID);
+        expect(stored?.status).toBe(TestRunStatus.FAILED);
+        expect(stored?.reason).toBe('bad config');
     });
 
     it('reports an unknown test run', async () => {
@@ -213,11 +155,12 @@ describe('HandleWorkerEventUseCase', () => {
     });
 
     it('ignores the event when updateIfStatus returns false', async () => {
-        repository.stored = restoreRun(TestRunStatus.PENDING);
+        repository.seed(restoreRun(TestRunStatus.PENDING));
         repository.rejectUpdates = true;
 
         await expect(useCase.execute(STARTED_EVENT)).resolves.toBe(WorkerEventOutcome.IGNORED);
 
-        expect(repository.stored?.status).toBe(TestRunStatus.PENDING);
+        const stored = await repository.findById(TEST_ID);
+        expect(stored?.status).toBe(TestRunStatus.PENDING);
     });
 });
