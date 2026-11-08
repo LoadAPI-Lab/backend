@@ -26,6 +26,7 @@ import {
 import {
     GetTestRunUseCase,
     ListTestRunsUseCase,
+    RerunTestRunUseCase,
     StartTestRunUseCase,
     StopTestRunUseCase,
     WatchTestRunUseCase,
@@ -34,6 +35,7 @@ import { TestRunExistsGuard } from '../../guards';
 import {
     GetTestRunSwagger,
     ListTestRunsSwagger,
+    RerunTestRunSwagger,
     StartTestRunSwagger,
     StopTestRunSwagger,
     WatchTestRunSwagger,
@@ -47,6 +49,7 @@ export class TestRunsController {
         private readonly listTestRuns: ListTestRunsUseCase,
         private readonly stopTestRun: StopTestRunUseCase,
         private readonly watchTestRun: WatchTestRunUseCase,
+        private readonly rerunTestRun: RerunTestRunUseCase,
     ) {}
 
     @Post()
@@ -74,6 +77,15 @@ export class TestRunsController {
         @CurrentUser() user: AuthenticatedUser,
     ): Promise<TestRunResponse> {
         return this.getTestRun.execute(params.id, user.id);
+    }
+
+    @Post(':id/rerun')
+    @RerunTestRunSwagger()
+    rerun(
+        @Param() params: TestRunParamsDto,
+        @CurrentUser() user: AuthenticatedUser,
+    ): Promise<StartTestRunResponse> {
+        return this.rerunTestRun.execute(params.id, user.id);
     }
 
     @Post(':id/stop')

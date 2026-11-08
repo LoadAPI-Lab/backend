@@ -30,11 +30,32 @@ export const StartTestRunSwagger = () =>
         SetMetadata(ZOD_RESPONSE_TOKEN, StartTestRunResponseDto),
     );
 
+export const RerunTestRunSwagger = () =>
+    applyDecorators(
+        ApiOperation({
+            summary: 'Re-run a test run',
+            description:
+                'Starts a new run with the stored config of the given run, whatever its status. Stores a PENDING run and enqueues the job.',
+        }),
+        ApiResponse({
+            status: HttpStatus.CREATED,
+            description: 'The new test run was created and enqueued',
+            type: StartTestRunResponseDto,
+        }),
+        ApiValidationError(),
+        ApiNotFound('Test run not found'),
+        ApiServiceUnavailable(
+            'Too many test runs are in progress, or the test job could not be enqueued',
+        ),
+        SetMetadata(ZOD_RESPONSE_TOKEN, StartTestRunResponseDto),
+    );
+
 export const GetTestRunSwagger = () =>
     applyDecorators(
         ApiOperation({
             summary: 'Get a test run',
-            description: 'Returns the run status and final result. The config is never included.',
+            description:
+                'Returns the run details: status, timestamps, failure reason, the stored config and the typed final result whose shape follows the run type. Secret header values and URL query parameter values are masked in the config and in the result URLs.',
         }),
         ApiResponse({
             status: HttpStatus.OK,
@@ -51,7 +72,7 @@ export const ListTestRunsSwagger = () =>
         ApiOperation({
             summary: 'List test runs',
             description:
-                'Returns the run history, newest first, with cursor pagination. Each item has the tested request and load or the steps count, and a result summary. Configs and full results are never included.',
+                'Returns the run history, newest first, with cursor pagination. Each item is a short row: status, timestamps and failure reason; single runs add the tested request, targetRps, durationSeconds and the response time p95Ms; scenario runs add stepsCount and okCount. Secret URL query parameter values are masked. Configs and results are never included: load them with GET /v1/test-runs/:id.',
         }),
         ApiResponse({
             status: HttpStatus.OK,

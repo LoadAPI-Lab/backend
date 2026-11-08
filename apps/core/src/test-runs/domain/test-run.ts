@@ -1,4 +1,4 @@
-import { FINAL_STATUSES, TestRunStatus, type TestType } from './constants';
+import { FINAL_STATUSES, TestRunStatus, TestType } from './constants';
 import type { ScenarioConfig, SingleConfig, TestConfigInput } from './schemas';
 
 export type TestRunConfig = SingleConfig | ScenarioConfig;
@@ -77,6 +77,16 @@ export class TestRun {
 
     get config(): TestRunConfig {
         return this.state.config;
+    }
+
+    get configInput(): TestConfigInput {
+        const { config } = this.state;
+
+        if ('steps' in config) {
+            return { type: TestType.SCENARIO, config };
+        }
+
+        return { type: TestType.SINGLE, config };
     }
 
     get reason(): string | undefined {
