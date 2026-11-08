@@ -2,9 +2,9 @@ import { applyDecorators } from '@nestjs/common';
 import { ApiResponse, getSchemaPath } from '@nestjs/swagger';
 
 import { ErrorCode } from './codes';
-import { GlobalErrorResponse } from './schema';
+import { type ErrorDetail, GlobalErrorResponse } from './schema';
 
-type TDetails = { field: string; message: string; code: string }[];
+type TDetails = ErrorDetail[];
 
 export const ApiErrorResponse = (
     status: number,

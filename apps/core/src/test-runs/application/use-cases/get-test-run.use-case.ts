@@ -9,8 +9,8 @@ import { toTestRunResponse } from '../mappers';
 export class GetTestRunUseCase {
     constructor(private readonly repository: TestRunsRepository) {}
 
-    async execute(id: string): Promise<TestRunResponse> {
-        const run = await this.repository.findById(id);
+    async execute(id: string, userId: string): Promise<TestRunResponse> {
+        const run = await this.repository.findByIdForUser(id, userId);
 
         if (!run) {
             throw testRunException(TestRunErrorCodes.NOT_FOUND);

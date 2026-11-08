@@ -5,6 +5,18 @@ export const ErrorDetailSchema = z.object({
     field: z.string().describe('Path to the field (e.g. "user.email")'),
     message: z.string().describe('Error message'),
     code: z.string().describe('Machine-readable code (e.g. "too_small")'),
+    line: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('1-based line in the submitted text, for syntax errors'),
+    column: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('1-based column in the submitted text, for syntax errors'),
 });
 
 export type ErrorDetail = z.infer<typeof ErrorDetailSchema>;

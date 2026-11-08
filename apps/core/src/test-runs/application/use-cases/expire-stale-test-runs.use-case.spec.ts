@@ -12,6 +12,8 @@ import { ExpireStaleTestRunsUseCase } from './expire-stale-test-runs.use-case';
 const FIRST_ID = 'b3f1c2d4-7a1e-4f0b-9c3a-2e8d5f6a7b90';
 const SECOND_ID = '8c2a1f00-7a1e-4f0b-9c3a-2e8d5f6a7b90';
 
+const OWNER_ID = '5d7e9a10-3c4b-4e2f-8a1d-6b9c0e2f4a13';
+
 const PENDING_TIMEOUT_MS = 30_000;
 const RUNNING_GRACE_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -42,6 +44,7 @@ const after = (base: Date, ms: number): Date => new Date(base.getTime() + ms);
 const pendingRun = (id = FIRST_ID): TestRun =>
     TestRun.restore({
         id,
+        userId: OWNER_ID,
         type: TestType.SINGLE,
         status: TestRunStatus.PENDING,
         config: SINGLE_CONFIG,
@@ -51,6 +54,7 @@ const pendingRun = (id = FIRST_ID): TestRun =>
 const runningSingle = (id = FIRST_ID): TestRun =>
     TestRun.restore({
         id,
+        userId: OWNER_ID,
         type: TestType.SINGLE,
         status: TestRunStatus.RUNNING,
         config: SINGLE_CONFIG,
@@ -61,6 +65,7 @@ const runningSingle = (id = FIRST_ID): TestRun =>
 const runningScenario = (): TestRun =>
     TestRun.restore({
         id: FIRST_ID,
+        userId: OWNER_ID,
         type: TestType.SCENARIO,
         status: TestRunStatus.RUNNING,
         config: SCENARIO_CONFIG,
@@ -78,6 +83,10 @@ class FakeTestRunsRepository implements TestRunsRepository {
     async create(): Promise<void> {}
 
     async findById(): Promise<TestRun | undefined> {
+        return undefined;
+    }
+
+    async findByIdForUser(): Promise<TestRun | undefined> {
         return undefined;
     }
 

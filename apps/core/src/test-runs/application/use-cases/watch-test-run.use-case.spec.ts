@@ -11,6 +11,8 @@ import { WatchTestRunUseCase } from './watch-test-run.use-case';
 
 const TEST_ID = 'b3f1c2d4-7a1e-4f0b-9c3a-2e8d5f6a7b90';
 const UNKNOWN_TEST_ID = '8c2a1f00-7a1e-4f0b-9c3a-2e8d5f6a7b90';
+const OWNER_ID = '5d7e9a10-3c4b-4e2f-8a1d-6b9c0e2f4a13';
+const OTHER_USER_ID = 'e1a2b3c4-5d6e-4f70-8a9b-0c1d2e3f4a5b';
 const FAILURE_REASON = 'bad config';
 const FIRST_SNAPSHOT = { elapsedSeconds: 1 };
 const SECOND_SNAPSHOT = { elapsedSeconds: 2 };
@@ -18,6 +20,7 @@ const SECOND_SNAPSHOT = { elapsedSeconds: 2 };
 function restoreRun(status: TestRunStatus, reason?: string): TestRun {
     return TestRun.restore({
         id: TEST_ID,
+        userId: OWNER_ID,
         type: TestType.SINGLE,
         status,
         config: {
@@ -44,9 +47,13 @@ class FakeTestRunsRepository implements TestRunsRepository {
 
     async create(): Promise<void> {}
 
-    async findById(id: string): Promise<TestRun | undefined> {
+    async findById(): Promise<TestRun | undefined> {
+        return undefined;
+    }
+
+    async findByIdForUser(id: string, userId: string): Promise<TestRun | undefined> {
         this.reads += 1;
-        const captured = this.stored?.id === id ? this.stored : undefined;
+        const captured = [this.stored].find((run) => run?.id === id && run.userId === userId);
 
         if (this.reads > 1) {
             await this.pendingRead;
@@ -111,7 +118,9 @@ describe('WatchTestRunUseCase', () => {
     it('rejects an unknown id before returning a stream', async () => {
         repository.stored = restoreRun(TestRunStatus.RUNNING);
 
-        const rejection = await useCase.execute(UNKNOWN_TEST_ID).catch((error: unknown) => error);
+        const rejection = await useCase
+            .execute(UNKNOWN_TEST_ID, OWNER_ID)
+            .catch((error: unknown) => error);
 
         expect(rejection).toBeInstanceOf(BaseException);
         const exception = rejection as BaseException;
@@ -119,10 +128,24 @@ describe('WatchTestRunUseCase', () => {
         expect(exception.getResponse()).toMatchObject({ code: TestRunErrorCodes.NOT_FOUND });
     });
 
+    it("rejects another user's run as not found before returning a stream", async () => {
+        repository.stored = restoreRun(TestRunStatus.RUNNING);
+
+        const rejection = await useCase
+            .execute(TEST_ID, OTHER_USER_ID)
+            .catch((error: unknown) => error);
+
+        expect(rejection).toBeInstanceOf(BaseException);
+        const exception = rejection as BaseException;
+        expect(exception.getStatus()).toBe(HttpStatus.NOT_FOUND);
+        expect(exception.getResponse()).toMatchObject({ code: TestRunErrorCodes.NOT_FOUND });
+        expect(liveFeed.events.observed).toBe(false);
+    });
+
     it('emits one status event and completes for a final run', async () => {
         repository.stored = restoreRun(TestRunStatus.FAILED, FAILURE_REASON);
 
-        const events = await collect(await useCase.execute(TEST_ID));
+        const events = await collect(await useCase.execute(TEST_ID, OWNER_ID));
 
         expect(events).toEqual([statusEvent(TestRunStatus.FAILED, FAILURE_REASON)]);
     });
@@ -130,7 +153,7 @@ describe('WatchTestRunUseCase', () => {
     it('emits the status, then snapshots, and completes on a final status', async () => {
         repository.stored = restoreRun(TestRunStatus.RUNNING);
 
-        const collected = collect(await useCase.execute(TEST_ID));
+        const collected = collect(await useCase.execute(TEST_ID, OWNER_ID));
         await flushMicrotasks();
         liveFeed.events.next(snapshotEvent(FIRST_SNAPSHOT));
         liveFeed.events.next(snapshotEvent(SECOND_SNAPSHOT));
@@ -151,7 +174,7 @@ describe('WatchTestRunUseCase', () => {
             finishSecondRead = resolve;
         });
 
-        const collected = collect(await useCase.execute(TEST_ID));
+        const collected = collect(await useCase.execute(TEST_ID, OWNER_ID));
         await flushMicrotasks();
         liveFeed.publishFinalStatus(TestRunStatus.STOPPED);
         finishSecondRead();
@@ -165,7 +188,7 @@ describe('WatchTestRunUseCase', () => {
     it('stops watching the feed when the stream ends', async () => {
         repository.stored = restoreRun(TestRunStatus.COMPLETED);
 
-        await collect(await useCase.execute(TEST_ID));
+        await collect(await useCase.execute(TEST_ID, OWNER_ID));
 
         expect(liveFeed.events.observed).toBe(false);
     });

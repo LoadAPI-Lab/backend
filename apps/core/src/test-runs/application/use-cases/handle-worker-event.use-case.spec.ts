@@ -10,6 +10,7 @@ import { HandleWorkerEventUseCase, WorkerEventOutcome } from './handle-worker-ev
 
 const TEST_ID = 'b3f1c2d4-7a1e-4f0b-9c3a-2e8d5f6a7b90';
 const UNKNOWN_TEST_ID = '8c2a1f00-7a1e-4f0b-9c3a-2e8d5f6a7b90';
+const OWNER_ID = '5d7e9a10-3c4b-4e2f-8a1d-6b9c0e2f4a13';
 
 const SINGLE_CONFIG: SingleConfig = {
     target: { method: HttpMethod.GET, url: 'https://api.example.com/users' },
@@ -52,6 +53,7 @@ const FAILED_EVENT: FinishedEvent = {
 function restoreRun(status: TestRunStatus, result?: unknown): TestRun {
     return TestRun.restore({
         id: TEST_ID,
+        userId: OWNER_ID,
         type: TestType.SINGLE,
         status,
         config: SINGLE_CONFIG,
@@ -76,6 +78,7 @@ class InMemoryTestRunsRepository implements TestRunsRepository {
 
         return TestRun.restore({
             id: this.stored.id,
+            userId: this.stored.userId,
             type: this.stored.type,
             status: this.stored.status,
             config: this.stored.config,
@@ -85,6 +88,11 @@ class InMemoryTestRunsRepository implements TestRunsRepository {
             startedAt: this.stored.startedAt,
             finishedAt: this.stored.finishedAt,
         });
+    }
+
+    async findByIdForUser(id: string, userId: string): Promise<TestRun | undefined> {
+        const run = await this.findById(id);
+        return [run].find((candidate) => candidate?.userId === userId);
     }
 
     async updateIfStatus(run: TestRun, expected: TestRunStatus): Promise<boolean> {
