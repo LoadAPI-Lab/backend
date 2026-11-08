@@ -1,4 +1,4 @@
-import type { TestRunStatus, TestType } from '../constants';
+import type { CreateTestRunOutcome, TestRunStatus, TestType } from '../constants';
 import type { TestRun } from '../test-run';
 
 export interface TestRunPageCursor {
@@ -15,7 +15,8 @@ export interface TestRunPageQuery {
 }
 
 export abstract class TestRunsRepository {
-    abstract create(run: TestRun): Promise<void>;
+    abstract create(run: TestRun): Promise<CreateTestRunOutcome>;
+    abstract existsActiveWithConfigHash(userId: string, configHash: string): Promise<boolean>;
     abstract findById(id: string): Promise<TestRun | undefined>;
     abstract findByIdForUser(id: string, userId: string): Promise<TestRun | undefined>;
     abstract updateIfStatus(run: TestRun, expected: TestRunStatus): Promise<boolean>;

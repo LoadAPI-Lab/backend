@@ -1,6 +1,12 @@
 import { EMPTY } from 'rxjs';
 
-import { HttpMethod, TestRunStatus, TestType, WorkerEventType } from '../../domain/constants';
+import {
+    CreateTestRunOutcome,
+    HttpMethod,
+    TestRunStatus,
+    TestType,
+    WorkerEventType,
+} from '../../domain/constants';
 import type { LiveFeed } from '../../domain/ports';
 import { TestRunsRepository } from '../../domain/repositories';
 import type { SingleConfig } from '../../domain/schemas';
@@ -67,8 +73,13 @@ class InMemoryTestRunsRepository implements TestRunsRepository {
     stored?: TestRun;
     rejectUpdates = false;
 
-    async create(run: TestRun): Promise<void> {
+    async create(run: TestRun): Promise<CreateTestRunOutcome> {
         this.stored = run;
+        return CreateTestRunOutcome.CREATED;
+    }
+
+    async existsActiveWithConfigHash(): Promise<boolean> {
+        return false;
     }
 
     async findById(id: string): Promise<TestRun | undefined> {

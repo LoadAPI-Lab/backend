@@ -3,7 +3,7 @@ import { isBaseExceptionWithCode } from '@shared/error';
 import type { FastifyRequest } from 'fastify';
 
 import { GetTestRunUseCase } from '../../application/use-cases';
-import { HttpMethod, TestRunStatus, TestType } from '../../domain/constants';
+import { CreateTestRunOutcome, HttpMethod, TestRunStatus, TestType } from '../../domain/constants';
 import { TestRunErrorCodes } from '../../domain/errors';
 import type { TestRunsRepository } from '../../domain/repositories';
 import { TestRun } from '../../domain/test-run';
@@ -32,7 +32,13 @@ const storedRun = (): TestRun =>
 class FakeTestRunsRepository implements TestRunsRepository {
     constructor(private readonly stored: TestRun) {}
 
-    async create(): Promise<void> {}
+    async create(): Promise<CreateTestRunOutcome> {
+        return CreateTestRunOutcome.CREATED;
+    }
+
+    async existsActiveWithConfigHash(): Promise<boolean> {
+        return false;
+    }
 
     async findById(id: string): Promise<TestRun | undefined> {
         return [this.stored].find((run) => run.id === id);

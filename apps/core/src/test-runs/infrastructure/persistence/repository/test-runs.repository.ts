@@ -1,16 +1,35 @@
 import { DATABASE_SERVICE, type DatabaseService } from '@libs/database';
 import { Inject, Injectable } from '@nestjs/common';
 import * as schema from '@shared/entities';
-import { and, desc, eq, inArray, type SQL, sql } from 'drizzle-orm';
+import { and, desc, DrizzleQueryError, eq, inArray, type SQL, sql } from 'drizzle-orm';
+import { PostgresError } from 'postgres';
 
-import { ACTIVE_STATUSES, type TestRunStatus } from '../../../domain/constants';
+import {
+    ACTIVE_STATUSES,
+    CreateTestRunOutcome,
+    type TestRunStatus,
+} from '../../../domain/constants';
 import { TestRunsRepository, type TestRunPageQuery } from '../../../domain/repositories';
 import type { TestRun } from '../../../domain/test-run';
 import { toDomainTestRun, toTestRunRow } from '../mappers';
-import { testRuns } from '../models';
+import { ACTIVE_CONFIG_HASH_UNIQUE_INDEX, testRuns } from '../models';
 
 const SINGLE_ROW_LIMIT = 1;
 const NEXT_PAGE_PROBE_ROWS = 1;
+const UNIQUE_VIOLATION_CODE = '23505';
+
+const isActiveConfigHashViolation = (error: unknown): boolean => {
+    if (!(error instanceof DrizzleQueryError)) {
+        return false;
+    }
+
+    const { cause } = error;
+    return (
+        cause instanceof PostgresError &&
+        cause.code === UNIQUE_VIOLATION_CODE &&
+        cause.constraint_name === ACTIVE_CONFIG_HASH_UNIQUE_INDEX
+    );
+};
 
 @Injectable()
 export class TestRunsRepositoryImpl implements TestRunsRepository {
@@ -19,8 +38,31 @@ export class TestRunsRepositoryImpl implements TestRunsRepository {
         private readonly db: DatabaseService<typeof schema>,
     ) {}
 
-    async create(run: TestRun): Promise<void> {
-        await this.db.insert(testRuns).values(toTestRunRow(run));
+    async create(run: TestRun): Promise<CreateTestRunOutcome> {
+        try {
+            await this.db.insert(testRuns).values(toTestRunRow(run));
+        } catch (error) {
+            if (isActiveConfigHashViolation(error)) {
+                return CreateTestRunOutcome.DUPLICATE_ACTIVE;
+            }
+            throw error;
+        }
+        return CreateTestRunOutcome.CREATED;
+    }
+
+    async existsActiveWithConfigHash(userId: string, configHash: string): Promise<boolean> {
+        const [row] = await this.db
+            .select({ id: testRuns.id })
+            .from(testRuns)
+            .where(
+                and(
+                    eq(testRuns.userId, userId),
+                    eq(testRuns.configHash, configHash),
+                    inArray(testRuns.status, ACTIVE_STATUSES),
+                ),
+            )
+            .limit(SINGLE_ROW_LIMIT);
+        return row !== undefined;
     }
 
     async findById(id: string): Promise<TestRun | undefined> {

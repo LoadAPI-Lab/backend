@@ -1,8 +1,12 @@
 import { users } from '@core/users/infrastructure/persistence/models';
-import { index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { inArray } from 'drizzle-orm';
+import { index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
+import { ACTIVE_STATUSES } from '../../../domain/constants';
 import type { ScenarioConfig, SingleConfig } from '../../../domain/schemas';
 import { testRunStatusEnum, testTypeEnum } from './enums';
+
+export const ACTIVE_CONFIG_HASH_UNIQUE_INDEX = 'test_runs_user_active_config_hash_uidx';
 
 export const testRuns = pgTable(
     'test_runs',
@@ -14,6 +18,7 @@ export const testRuns = pgTable(
         type: testTypeEnum().notNull(),
         status: testRunStatusEnum().notNull(),
         config: jsonb().$type<SingleConfig | ScenarioConfig>().notNull(),
+        configHash: text(),
         reason: text(),
         result: jsonb().$type<unknown>(),
         createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -27,5 +32,8 @@ export const testRuns = pgTable(
             table.createdAt.desc(),
             table.id.desc(),
         ),
+        uniqueIndex(ACTIVE_CONFIG_HASH_UNIQUE_INDEX)
+            .on(table.userId, table.configHash)
+            .where(inArray(table.status, ACTIVE_STATUSES).inlineParams()),
     ],
 );

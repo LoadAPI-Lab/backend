@@ -1,7 +1,7 @@
 import type { ConfigService } from '@nestjs/config';
 import { isBaseExceptionWithCode } from '@shared/error';
 
-import { HttpMethod, TestRunStatus, TestType } from '../../domain/constants';
+import { CreateTestRunOutcome, HttpMethod, TestRunStatus, TestType } from '../../domain/constants';
 import { TestRunErrorCodes } from '../../domain/errors';
 import type { TestJob, WorkerOrchestrator } from '../../domain/ports';
 import type { TestRunsRepository } from '../../domain/repositories';
@@ -42,8 +42,13 @@ class FakeTestRunsRepository implements TestRunsRepository {
 
     constructor(private readonly stored: TestRun) {}
 
-    async create(run: TestRun): Promise<void> {
+    async create(run: TestRun): Promise<CreateTestRunOutcome> {
         this.created.push(run);
+        return CreateTestRunOutcome.CREATED;
+    }
+
+    async existsActiveWithConfigHash(): Promise<boolean> {
+        return false;
     }
 
     async findById(id: string): Promise<TestRun | undefined> {

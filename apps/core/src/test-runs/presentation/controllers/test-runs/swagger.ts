@@ -1,6 +1,12 @@
 import { applyDecorators, HttpStatus, SetMetadata } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiProduces, ApiResponse } from '@nestjs/swagger';
-import { ApiConflict, ApiNotFound, ApiServiceUnavailable, ApiValidationError } from '@shared/error';
+import {
+    ApiConflict,
+    ApiErrorResponse,
+    ApiNotFound,
+    ApiServiceUnavailable,
+    ApiValidationError,
+} from '@shared/error';
 import { ZOD_RESPONSE_TOKEN } from '@shared/interceptors';
 
 import {
@@ -10,20 +16,32 @@ import {
     StopTestRunResponseDto,
     TestRunResponseDto,
 } from '../../../application/dtos';
+import { TestRunErrorCodes, TestRunErrorMessages } from '../../../domain/errors';
+
+export const START_TEST_RUN_HTTP_STATUS = HttpStatus.CREATED;
+
+const ApiDuplicateActiveRun = () =>
+    ApiErrorResponse(
+        HttpStatus.CONFLICT,
+        TestRunErrorCodes.DUPLICATE_ACTIVE,
+        TestRunErrorMessages[TestRunErrorCodes.DUPLICATE_ACTIVE],
+    );
 
 export const StartTestRunSwagger = () =>
     applyDecorators(
         ApiOperation({
             summary: 'Start a test run',
-            description: 'Validates the config, stores a PENDING run and enqueues the job.',
+            description:
+                'Validates the config, rejects it when an identical run of the user is PENDING or RUNNING, stores a PENDING run and enqueues the job.',
         }),
         ApiBody({ type: StartTestRunDto }),
         ApiResponse({
-            status: HttpStatus.CREATED,
+            status: START_TEST_RUN_HTTP_STATUS,
             description: 'The test run was created and enqueued',
             type: StartTestRunResponseDto,
         }),
         ApiValidationError(),
+        ApiDuplicateActiveRun(),
         ApiServiceUnavailable(
             'Too many test runs are in progress, or the test job could not be enqueued',
         ),
@@ -35,15 +53,16 @@ export const RerunTestRunSwagger = () =>
         ApiOperation({
             summary: 'Re-run a test run',
             description:
-                'Starts a new run with the stored config of the given run, whatever its status. Stores a PENDING run and enqueues the job.',
+                'Starts a new run with the stored config of the given run, whatever its status. Rejects it when an identical run of the user is PENDING or RUNNING, otherwise stores a PENDING run and enqueues the job.',
         }),
         ApiResponse({
-            status: HttpStatus.CREATED,
+            status: START_TEST_RUN_HTTP_STATUS,
             description: 'The new test run was created and enqueued',
             type: StartTestRunResponseDto,
         }),
         ApiValidationError(),
         ApiNotFound('Test run not found'),
+        ApiDuplicateActiveRun(),
         ApiServiceUnavailable(
             'Too many test runs are in progress, or the test job could not be enqueued',
         ),

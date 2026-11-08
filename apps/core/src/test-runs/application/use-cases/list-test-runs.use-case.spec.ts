@@ -1,4 +1,4 @@
-import { HttpMethod, TestRunStatus, TestType } from '../../domain/constants';
+import { CreateTestRunOutcome, HttpMethod, TestRunStatus, TestType } from '../../domain/constants';
 import type { TestRunPageQuery, TestRunsRepository } from '../../domain/repositories';
 import { TestRun } from '../../domain/test-run';
 import { ListTestRunsUseCase } from './list-test-runs.use-case';
@@ -29,7 +29,13 @@ const runOf = (id: string, userId: string, createdAt: string): TestRun =>
 class InMemoryTestRunsRepository implements TestRunsRepository {
     constructor(private readonly runs: TestRun[]) {}
 
-    async create(): Promise<void> {}
+    async create(): Promise<CreateTestRunOutcome> {
+        return CreateTestRunOutcome.CREATED;
+    }
+
+    async existsActiveWithConfigHash(): Promise<boolean> {
+        return false;
+    }
 
     async findById(): Promise<TestRun | undefined> {
         return undefined;

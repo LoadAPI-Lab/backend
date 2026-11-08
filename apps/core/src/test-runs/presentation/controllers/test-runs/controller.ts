@@ -36,6 +36,7 @@ import {
     GetTestRunSwagger,
     ListTestRunsSwagger,
     RerunTestRunSwagger,
+    START_TEST_RUN_HTTP_STATUS,
     StartTestRunSwagger,
     StopTestRunSwagger,
     WatchTestRunSwagger,
@@ -53,6 +54,7 @@ export class TestRunsController {
     ) {}
 
     @Post()
+    @HttpCode(START_TEST_RUN_HTTP_STATUS)
     @StartTestRunSwagger()
     start(
         @Body() dto: StartTestRunDto,
@@ -80,6 +82,7 @@ export class TestRunsController {
     }
 
     @Post(':id/rerun')
+    @HttpCode(START_TEST_RUN_HTTP_STATUS)
     @RerunTestRunSwagger()
     rerun(
         @Param() params: TestRunParamsDto,

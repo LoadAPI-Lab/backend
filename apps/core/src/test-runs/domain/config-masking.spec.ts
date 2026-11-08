@@ -90,8 +90,14 @@ describe('maskTestRunConfig', () => {
         );
     });
 
-    it('returns an unparsable URL unchanged', () => {
-        const url = `not a url?api_key=${QUERY_SECRET}`;
+    it('masks the query of a URL with a placeholder in the host', () => {
+        expect(maskedUrl(`http://{{host}}/x?api_key=${QUERY_SECRET}`)).toBe(
+            'http://{{host}}/x?api_key=***',
+        );
+    });
+
+    it('returns a string without a query unchanged', () => {
+        const url = 'http://{{host}}/x';
 
         expect(maskedUrl(url)).toBe(url);
     });

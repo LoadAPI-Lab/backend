@@ -9,6 +9,7 @@ const SINGLE_CONFIG: SingleConfig = {
 };
 
 const OWNER_ID = '5d7e9a10-3c4b-4e2f-8a1d-6b9c0e2f4a13';
+const CONFIG_HASH = 'a'.repeat(64);
 
 const CREATED_AT = new Date('2026-01-01T00:00:00.000Z');
 const STARTED_AT = new Date('2026-01-01T00:01:00.000Z');
@@ -60,6 +61,7 @@ describe('TestRun', () => {
             const now = new Date('2026-02-01T10:00:00.000Z');
             const run = TestRun.create({
                 userId: OWNER_ID,
+                configHash: CONFIG_HASH,
                 type: TestType.SCENARIO,
                 config: { steps: [] },
                 now,
@@ -81,6 +83,7 @@ describe('TestRun', () => {
             const before = Date.now();
             const run = TestRun.create({
                 userId: OWNER_ID,
+                configHash: CONFIG_HASH,
                 type: TestType.SINGLE,
                 config: SINGLE_CONFIG,
             });

@@ -1,3 +1,4 @@
+export * from './create-test-run-outcome';
 export * from './failure-reason';
 export * from './http-methods';
 export * from './limits';

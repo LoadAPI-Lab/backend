@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { TestRunStatus } from '../../domain/constants';
+import { hashTestConfig } from '../../domain/config-hash';
+import { CreateTestRunOutcome, TestRunStatus } from '../../domain/constants';
 import { TestRunErrorCodes, testRunException } from '../../domain/errors';
 import { WorkerOrchestrator } from '../../domain/ports';
 import { TestRunsRepository } from '../../domain/repositories';
@@ -24,13 +25,22 @@ export class StartTestRunUseCase {
     }
 
     async execute(input: TestConfigInput, userId: string): Promise<StartTestRunResponse> {
+        const configHash = hashTestConfig(input);
+
+        if (await this.repository.existsActiveWithConfigHash(userId, configHash)) {
+            throw testRunException(TestRunErrorCodes.DUPLICATE_ACTIVE);
+        }
+
         const activeRuns = await this.repository.countActive();
         if (activeRuns >= this.maxConcurrentTests) {
             throw testRunException(TestRunErrorCodes.CAPACITY_EXCEEDED);
         }
 
-        const run = TestRun.create({ ...input, userId });
-        await this.repository.create(run);
+        const run = TestRun.create({ ...input, userId, configHash });
+        const outcome = await this.repository.create(run);
+        if (outcome === CreateTestRunOutcome.DUPLICATE_ACTIVE) {
+            throw testRunException(TestRunErrorCodes.DUPLICATE_ACTIVE);
+        }
 
         try {
             await this.orchestrator.enqueue({ testId: run.id, ...input });

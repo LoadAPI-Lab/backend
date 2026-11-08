@@ -2,7 +2,13 @@ import { HttpStatus } from '@nestjs/common';
 import { BaseException } from '@shared/error';
 import { firstValueFrom, type Observable, Subject, toArray } from 'rxjs';
 
-import { HttpMethod, LiveEventType, TestRunStatus, TestType } from '../../domain/constants';
+import {
+    CreateTestRunOutcome,
+    HttpMethod,
+    LiveEventType,
+    TestRunStatus,
+    TestType,
+} from '../../domain/constants';
 import { TestRunErrorCodes } from '../../domain/errors';
 import type { LiveEvent, LiveFeed } from '../../domain/ports';
 import { TestRunsRepository } from '../../domain/repositories';
@@ -45,7 +51,13 @@ class FakeTestRunsRepository implements TestRunsRepository {
     pendingRead?: Promise<void>;
     reads = 0;
 
-    async create(): Promise<void> {}
+    async create(): Promise<CreateTestRunOutcome> {
+        return CreateTestRunOutcome.CREATED;
+    }
+
+    async existsActiveWithConfigHash(): Promise<boolean> {
+        return false;
+    }
 
     async findById(): Promise<TestRun | undefined> {
         return undefined;

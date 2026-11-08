@@ -38,15 +38,6 @@ const decodeQueryComponent = (component: string): string => {
     }
 };
 
-const isParsableUrl = (url: string): boolean => {
-    try {
-        new URL(url);
-        return true;
-    } catch {
-        return false;
-    }
-};
-
 const splitAt = (text: string, separator: string): [string, string] => {
     const index = text.indexOf(separator);
     if (index === NOT_FOUND_INDEX) {
@@ -111,10 +102,6 @@ const maskQueryParam = (param: string): string => {
 };
 
 export const maskUrl = (url: string): string => {
-    if (!isParsableUrl(url)) {
-        return url;
-    }
-
     const [withoutFragment, fragment] = splitAt(url, FRAGMENT_START);
     const [beforeQuery, queryWithStart] = splitAt(withoutFragment, QUERY_START);
 

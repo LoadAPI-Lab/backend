@@ -43,6 +43,13 @@
             "when": 1793977997296,
             "tag": "0005_api_specs",
             "breakpoints": false
+        },
+        {
+            "idx": 6,
+            "version": "7",
+            "when": 1794160940699,
+            "tag": "0006_test_runs_config_hash",
+            "breakpoints": false
         }
     ]
 }
