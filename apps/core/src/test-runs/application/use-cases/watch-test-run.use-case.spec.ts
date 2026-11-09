@@ -1,10 +1,10 @@
-import { HttpStatus } from '@nestjs/common';
+import { HttpStatus, Logger } from '@nestjs/common';
 import { BaseException } from '@shared/error';
 import { firstValueFrom, type Observable, Subject, toArray } from 'rxjs';
 
 import { HttpMethod, LiveEventType, TestRunStatus, TestType } from '../../domain/constants';
 import { TestRunErrorCodes } from '../../domain/errors';
-import type { LiveEvent, LiveFeed } from '../../domain/ports';
+import type { LiveEvent, LiveFeed, SnapshotHistory } from '../../domain/ports';
 import { TestRun } from '../../domain/test-run';
 import { InMemoryTestRunsRepository } from '../../testing';
 import { WatchTestRunUseCase } from './watch-test-run.use-case';
@@ -16,6 +16,9 @@ const OTHER_USER_ID = 'e1a2b3c4-5d6e-4f70-8a9b-0c1d2e3f4a5b';
 const FAILURE_REASON = 'bad config';
 const FIRST_SNAPSHOT = { elapsedSeconds: 1 };
 const SECOND_SNAPSHOT = { elapsedSeconds: 2 };
+const THIRD_SNAPSHOT = { elapsedSeconds: 3 };
+const FOURTH_SNAPSHOT = { elapsedSeconds: 4 };
+const STORED_HISTORY = [FIRST_SNAPSHOT, SECOND_SNAPSHOT, THIRD_SNAPSHOT];
 
 function restoreRun(status: TestRunStatus, reason?: string): TestRun {
     return TestRun.restore({
@@ -73,6 +76,22 @@ class FakeLiveFeed implements LiveFeed {
     }
 }
 
+class FakeSnapshotHistory implements SnapshotHistory {
+    snapshots: unknown[] = [];
+    pendingRead?: Promise<void>;
+    failure?: Error;
+
+    async read(): Promise<unknown[]> {
+        await this.pendingRead;
+
+        if (this.failure) {
+            throw this.failure;
+        }
+
+        return this.snapshots;
+    }
+}
+
 const collect = (stream: Observable<LiveEvent>): Promise<LiveEvent[]> =>
     firstValueFrom(stream.pipe(toArray()));
 
@@ -84,12 +103,14 @@ const flushMicrotasks = (): Promise<void> =>
 describe('WatchTestRunUseCase', () => {
     let repository: DelayedSecondReadTestRunsRepository;
     let liveFeed: FakeLiveFeed;
+    let snapshotHistory: FakeSnapshotHistory;
     let useCase: WatchTestRunUseCase;
 
     beforeEach(() => {
         repository = new DelayedSecondReadTestRunsRepository();
         liveFeed = new FakeLiveFeed();
-        useCase = new WatchTestRunUseCase(repository, liveFeed);
+        snapshotHistory = new FakeSnapshotHistory();
+        useCase = new WatchTestRunUseCase(repository, liveFeed, snapshotHistory);
     });
 
     it('rejects an unknown id before returning a stream', async () => {
@@ -168,5 +189,101 @@ describe('WatchTestRunUseCase', () => {
         await collect(await useCase.execute(TEST_ID, OWNER_ID));
 
         expect(liveFeed.events.observed).toBe(false);
+    });
+
+    it('emits the history, then only newer live snapshots', async () => {
+        repository.seed(restoreRun(TestRunStatus.RUNNING));
+        snapshotHistory.snapshots = STORED_HISTORY;
+
+        const collected = collect(await useCase.execute(TEST_ID, OWNER_ID));
+        await flushMicrotasks();
+        liveFeed.events.next(snapshotEvent(THIRD_SNAPSHOT));
+        liveFeed.events.next(snapshotEvent(FOURTH_SNAPSHOT));
+        liveFeed.publishFinalStatus(TestRunStatus.COMPLETED);
+
+        await expect(collected).resolves.toEqual([
+            statusEvent(TestRunStatus.RUNNING),
+            snapshotEvent(FIRST_SNAPSHOT),
+            snapshotEvent(SECOND_SNAPSHOT),
+            snapshotEvent(THIRD_SNAPSHOT),
+            snapshotEvent(FOURTH_SNAPSHOT),
+            statusEvent(TestRunStatus.COMPLETED),
+        ]);
+    });
+
+    it('keeps snapshots published during the history read without duplicates', async () => {
+        repository.seed(restoreRun(TestRunStatus.RUNNING));
+        snapshotHistory.snapshots = STORED_HISTORY;
+        let finishHistoryRead = (): void => undefined;
+        snapshotHistory.pendingRead = new Promise((resolve) => {
+            finishHistoryRead = resolve;
+        });
+
+        const collected = collect(await useCase.execute(TEST_ID, OWNER_ID));
+        await flushMicrotasks();
+        liveFeed.events.next(snapshotEvent(THIRD_SNAPSHOT));
+        liveFeed.events.next(snapshotEvent(FOURTH_SNAPSHOT));
+        finishHistoryRead();
+        await flushMicrotasks();
+        liveFeed.publishFinalStatus(TestRunStatus.COMPLETED);
+
+        await expect(collected).resolves.toEqual([
+            statusEvent(TestRunStatus.RUNNING),
+            snapshotEvent(FIRST_SNAPSHOT),
+            snapshotEvent(SECOND_SNAPSHOT),
+            snapshotEvent(THIRD_SNAPSHOT),
+            snapshotEvent(FOURTH_SNAPSHOT),
+            statusEvent(TestRunStatus.COMPLETED),
+        ]);
+    });
+
+    it('emits only live snapshots when the history is empty', async () => {
+        repository.seed(restoreRun(TestRunStatus.RUNNING));
+
+        const collected = collect(await useCase.execute(TEST_ID, OWNER_ID));
+        await flushMicrotasks();
+        liveFeed.events.next(snapshotEvent(FIRST_SNAPSHOT));
+        liveFeed.events.next(snapshotEvent(SECOND_SNAPSHOT));
+        liveFeed.publishFinalStatus(TestRunStatus.COMPLETED);
+
+        await expect(collected).resolves.toEqual([
+            statusEvent(TestRunStatus.RUNNING),
+            snapshotEvent(FIRST_SNAPSHOT),
+            snapshotEvent(SECOND_SNAPSHOT),
+            statusEvent(TestRunStatus.COMPLETED),
+        ]);
+    });
+
+    it('emits the history before the final status and completes for a final run', async () => {
+        repository.seed(restoreRun(TestRunStatus.COMPLETED));
+        snapshotHistory.snapshots = STORED_HISTORY;
+
+        const events = await collect(await useCase.execute(TEST_ID, OWNER_ID));
+
+        expect(events).toEqual([
+            snapshotEvent(FIRST_SNAPSHOT),
+            snapshotEvent(SECOND_SNAPSHOT),
+            snapshotEvent(THIRD_SNAPSHOT),
+            statusEvent(TestRunStatus.COMPLETED),
+        ]);
+    });
+
+    it('streams live snapshots when the history read fails', async () => {
+        const warn = vi.spyOn(Logger.prototype, 'warn').mockReturnValue();
+        repository.seed(restoreRun(TestRunStatus.RUNNING));
+        snapshotHistory.failure = new Error('connection lost');
+
+        const collected = collect(await useCase.execute(TEST_ID, OWNER_ID));
+        await flushMicrotasks();
+        liveFeed.events.next(snapshotEvent(FIRST_SNAPSHOT));
+        liveFeed.publishFinalStatus(TestRunStatus.COMPLETED);
+
+        await expect(collected).resolves.toEqual([
+            statusEvent(TestRunStatus.RUNNING),
+            snapshotEvent(FIRST_SNAPSHOT),
+            statusEvent(TestRunStatus.COMPLETED),
+        ]);
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining(TEST_ID));
+        warn.mockRestore();
     });
 });
