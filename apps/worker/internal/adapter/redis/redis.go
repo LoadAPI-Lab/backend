@@ -3,16 +3,20 @@ package redis
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	goredis "github.com/redis/go-redis/v9"
 )
 
 const (
-	pingTimeout       = 5 * time.Second
-	watchSetupTimeout = 2 * time.Second
-	stopChannelPrefix = "stop:"
-	stoppedKeyPrefix  = "stopped:"
+	pingTimeout           = 5 * time.Second
+	watchSetupTimeout     = 2 * time.Second
+	stopChannelPrefix     = "stop:"
+	stoppedKeyPrefix      = "stopped:"
+	snapshotChannelPrefix = "snapshot:"
+	historyKeyPrefix      = "snapshot-history:"
+	historyTTL            = time.Hour
 )
 
 type Client struct {
@@ -39,7 +43,26 @@ func New(url string) (*Client, error) {
 }
 
 func (p *Client) Publish(ctx context.Context, destination string, body []byte) error {
-	return p.client.Publish(ctx, destination, body).Err()
+	key, ok := historyKey(destination)
+	if !ok {
+		return p.client.Publish(ctx, destination, body).Err()
+	}
+
+	_, err := p.client.TxPipelined(ctx, func(pipe goredis.Pipeliner) error {
+		pipe.RPush(ctx, key, body)
+		pipe.Expire(ctx, key, historyTTL)
+		pipe.Publish(ctx, destination, body)
+		return nil
+	})
+	return err
+}
+
+func historyKey(channel string) (string, bool) {
+	testId, ok := strings.CutPrefix(channel, snapshotChannelPrefix)
+	if !ok || testId == "" {
+		return "", false
+	}
+	return historyKeyPrefix + testId, true
 }
 
 func (c *Client) Watch(ctx context.Context, testId string) (context.Context, context.CancelFunc, error) {
