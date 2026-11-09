@@ -1,5 +1,8 @@
 export const SNAPSHOT_CHANNEL_PREFIX = 'snapshot:';
 export const SNAPSHOT_CHANNEL_PATTERN = `${SNAPSHOT_CHANNEL_PREFIX}*`;
+export const SNAPSHOT_HISTORY_KEY_PREFIX = 'snapshot-history:';
+export const SNAPSHOT_HISTORY_FIRST_INDEX = 0;
+export const SNAPSHOT_HISTORY_LAST_INDEX = -1;
 export const STOPPED_KEY_PREFIX = 'stopped:';
 export const STOP_CHANNEL_PREFIX = 'stop:';
 export const STOPPED_FLAG_VALUE = '1';
