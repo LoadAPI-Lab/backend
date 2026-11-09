@@ -4,3 +4,5 @@ export const MAX_SCENARIO_STEPS = 50;
 export const MIN_PAGE_LIMIT = 1;
 export const MAX_PAGE_LIMIT = 100;
 export const DEFAULT_PAGE_LIMIT = 20;
+export const MIN_IDEMPOTENCY_KEY_LENGTH = 1;
+export const MAX_IDEMPOTENCY_KEY_LENGTH = 255;

@@ -51,6 +51,6 @@
             "@shared/*": ["./src/shared/*"]
         }
     },
-    "include": ["src/**/*", "libs/**/*", "test/**/*", "drizzle.config.ts"],
+    "include": ["src/**/*", "libs/**/*", "drizzle.config.ts"],
     "exclude": ["dist", "node_modules"]
 }

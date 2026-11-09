@@ -1,4 +1,4 @@
-import { FINAL_STATUSES, TestRunStatus, type TestType } from './constants';
+import { FINAL_STATUSES, TestRunStatus, TestType } from './constants';
 import type { ScenarioConfig, SingleConfig, TestConfigInput } from './schemas';
 
 export type TestRunConfig = SingleConfig | ScenarioConfig;
@@ -11,6 +11,8 @@ interface TestRunState {
     readonly type: TestType;
     readonly config: TestRunConfig;
     readonly createdAt: Date;
+    readonly configHash?: string;
+    readonly idempotencyKey?: string;
     status: TestRunStatus;
     reason?: string;
     result?: unknown;
@@ -33,13 +35,22 @@ export const isFinalStatus = (status: TestRunStatus): boolean =>
 export class TestRun {
     private constructor(private readonly state: TestRunState) {}
 
-    static create(input: TestConfigInput & { userId: string; now?: Date }): TestRun {
+    static create(
+        input: TestConfigInput & {
+            userId: string;
+            configHash: string;
+            idempotencyKey?: string;
+            now?: Date;
+        },
+    ): TestRun {
         return new TestRun({
             id: crypto.randomUUID(),
             userId: input.userId,
             type: input.type,
             config: input.config,
             createdAt: input.now ?? new Date(),
+            configHash: input.configHash,
+            idempotencyKey: input.idempotencyKey,
             status: TestRunStatus.PENDING,
         });
     }
@@ -51,6 +62,8 @@ export class TestRun {
         status: TestRunStatus;
         config: TestRunConfig;
         createdAt: Date;
+        configHash?: string;
+        idempotencyKey?: string;
         reason?: string;
         result?: unknown;
         startedAt?: Date;
@@ -77,6 +90,24 @@ export class TestRun {
 
     get config(): TestRunConfig {
         return this.state.config;
+    }
+
+    get configInput(): TestConfigInput {
+        const { config } = this.state;
+
+        if ('steps' in config) {
+            return { type: TestType.SCENARIO, config };
+        }
+
+        return { type: TestType.SINGLE, config };
+    }
+
+    get configHash(): string | undefined {
+        return this.state.configHash;
+    }
+
+    get idempotencyKey(): string | undefined {
+        return this.state.idempotencyKey;
     }
 
     get reason(): string | undefined {

@@ -26,14 +26,18 @@ import {
 import {
     GetTestRunUseCase,
     ListTestRunsUseCase,
+    RerunTestRunUseCase,
     StartTestRunUseCase,
     StopTestRunUseCase,
     WatchTestRunUseCase,
 } from '../../../application/use-cases';
+import { IdempotencyKey } from '../../decorators';
 import { TestRunExistsGuard } from '../../guards';
 import {
     GetTestRunSwagger,
     ListTestRunsSwagger,
+    RerunTestRunSwagger,
+    START_TEST_RUN_HTTP_STATUS,
     StartTestRunSwagger,
     StopTestRunSwagger,
     WatchTestRunSwagger,
@@ -47,15 +51,18 @@ export class TestRunsController {
         private readonly listTestRuns: ListTestRunsUseCase,
         private readonly stopTestRun: StopTestRunUseCase,
         private readonly watchTestRun: WatchTestRunUseCase,
+        private readonly rerunTestRun: RerunTestRunUseCase,
     ) {}
 
     @Post()
+    @HttpCode(START_TEST_RUN_HTTP_STATUS)
     @StartTestRunSwagger()
     start(
         @Body() dto: StartTestRunDto,
         @CurrentUser() user: AuthenticatedUser,
+        @IdempotencyKey() idempotencyKey: string | undefined,
     ): Promise<StartTestRunResponse> {
-        return this.startTestRun.execute(dto, user.id);
+        return this.startTestRun.execute(dto, user.id, idempotencyKey);
     }
 
     @Get()
@@ -74,6 +81,17 @@ export class TestRunsController {
         @CurrentUser() user: AuthenticatedUser,
     ): Promise<TestRunResponse> {
         return this.getTestRun.execute(params.id, user.id);
+    }
+
+    @Post(':id/rerun')
+    @HttpCode(START_TEST_RUN_HTTP_STATUS)
+    @RerunTestRunSwagger()
+    rerun(
+        @Param() params: TestRunParamsDto,
+        @CurrentUser() user: AuthenticatedUser,
+        @IdempotencyKey() idempotencyKey: string | undefined,
+    ): Promise<StartTestRunResponse> {
+        return this.rerunTestRun.execute(params.id, user.id, idempotencyKey);
     }
 
     @Post(':id/stop')

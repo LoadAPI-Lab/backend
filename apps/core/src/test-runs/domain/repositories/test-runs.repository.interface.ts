@@ -1,4 +1,4 @@
-import type { TestRunStatus, TestType } from '../constants';
+import type { CreateTestRunOutcome, TestRunStatus, TestType } from '../constants';
 import type { TestRun } from '../test-run';
 
 export interface TestRunPageCursor {
@@ -15,9 +15,10 @@ export interface TestRunPageQuery {
 }
 
 export abstract class TestRunsRepository {
-    abstract create(run: TestRun): Promise<void>;
-    abstract findById(id: string): Promise<TestRun | undefined>;
-    abstract findByIdForUser(id: string, userId: string): Promise<TestRun | undefined>;
+    abstract create(run: TestRun): Promise<CreateTestRunOutcome>;
+    abstract findByIdempotencyKey(userId: string, idempotencyKey: string): Promise<TestRun | null>;
+    abstract findById(id: string): Promise<TestRun | null>;
+    abstract findByIdForUser(id: string, userId: string): Promise<TestRun | null>;
     abstract updateIfStatus(run: TestRun, expected: TestRunStatus): Promise<boolean>;
     abstract countActive(): Promise<number>;
     abstract findActive(): Promise<TestRun[]>;
