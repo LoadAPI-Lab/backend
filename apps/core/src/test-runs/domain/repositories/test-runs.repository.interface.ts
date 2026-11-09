@@ -16,7 +16,7 @@ export interface TestRunPageQuery {
 
 export abstract class TestRunsRepository {
     abstract create(run: TestRun): Promise<CreateTestRunOutcome>;
-    abstract existsActiveWithConfigHash(userId: string, configHash: string): Promise<boolean>;
+    abstract findByIdempotencyKey(userId: string, idempotencyKey: string): Promise<TestRun | null>;
     abstract findById(id: string): Promise<TestRun | null>;
     abstract findByIdForUser(id: string, userId: string): Promise<TestRun | null>;
     abstract updateIfStatus(run: TestRun, expected: TestRunStatus): Promise<boolean>;

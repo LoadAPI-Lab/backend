@@ -12,13 +12,17 @@ export class RerunTestRunUseCase {
         private readonly startTestRun: StartTestRunUseCase,
     ) {}
 
-    async execute(id: string, userId: string): Promise<StartTestRunResponse> {
+    async execute(
+        id: string,
+        userId: string,
+        idempotencyKey?: string,
+    ): Promise<StartTestRunResponse> {
         const run = await this.repository.findByIdForUser(id, userId);
 
         if (!run) {
             throw testRunException(TestRunErrorCodes.NOT_FOUND);
         }
 
-        return this.startTestRun.execute(run.configInput, userId);
+        return this.startTestRun.execute(run.configInput, userId, idempotencyKey);
     }
 }

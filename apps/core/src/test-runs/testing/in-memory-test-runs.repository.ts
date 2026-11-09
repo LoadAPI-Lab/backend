@@ -24,6 +24,7 @@ const copyOf = (run: TestRun): TestRun =>
         config: run.config,
         createdAt: run.createdAt,
         configHash: run.configHash,
+        idempotencyKey: run.idempotencyKey,
         reason: run.reason,
         result: run.result,
         startedAt: run.startedAt,
@@ -51,7 +52,6 @@ const isOlderThanCursor = (run: TestRun, cursor: TestRunPageCursor): boolean => 
 
 export class InMemoryTestRunsRepository implements TestRunsRepository {
     rejectUpdates = false;
-    rejectCreatesAsDuplicate = false;
 
     private readonly runs = new Map<string, TestRun>();
 
@@ -63,16 +63,23 @@ export class InMemoryTestRunsRepository implements TestRunsRepository {
     }
 
     async create(run: TestRun): Promise<CreateTestRunOutcome> {
-        if (this.rejectCreatesAsDuplicate || this.violatesActiveConfigHash(run)) {
-            return CreateTestRunOutcome.DUPLICATE_ACTIVE;
+        if (
+            run.idempotencyKey !== undefined &&
+            this.storedWithIdempotencyKey(run.userId, run.idempotencyKey)
+        ) {
+            return CreateTestRunOutcome.IDEMPOTENCY_KEY_CONFLICT;
         }
 
         this.runs.set(run.id, copyOf(run));
         return CreateTestRunOutcome.CREATED;
     }
 
-    async existsActiveWithConfigHash(userId: string, configHash: string): Promise<boolean> {
-        return this.hasActiveWithConfigHash(userId, configHash);
+    async findByIdempotencyKey(userId: string, idempotencyKey: string): Promise<TestRun | null> {
+        const run = this.storedWithIdempotencyKey(userId, idempotencyKey);
+        if (!run) {
+            return null;
+        }
+        return copyOf(run);
     }
 
     async findById(id: string): Promise<TestRun | null> {
@@ -127,17 +134,9 @@ export class InMemoryTestRunsRepository implements TestRunsRepository {
         return [...this.runs.values()].filter((run) => isActive(run.status));
     }
 
-    private hasActiveWithConfigHash(userId: string, configHash: string): boolean {
-        return this.activeRuns().some(
-            (run) => run.userId === userId && run.configHash === configHash,
-        );
-    }
-
-    private violatesActiveConfigHash(run: TestRun): boolean {
-        return (
-            run.configHash !== undefined &&
-            isActive(run.status) &&
-            this.hasActiveWithConfigHash(run.userId, run.configHash)
+    private storedWithIdempotencyKey(userId: string, idempotencyKey: string): TestRun | undefined {
+        return [...this.runs.values()].find(
+            (run) => run.userId === userId && run.idempotencyKey === idempotencyKey,
         );
     }
 }

@@ -12,13 +12,13 @@ import {
 import { TestRunsRepository, type TestRunPageQuery } from '../../../domain/repositories';
 import type { TestRun } from '../../../domain/test-run';
 import { toDomainTestRun, toTestRunRow } from '../mappers';
-import { ACTIVE_CONFIG_HASH_UNIQUE_INDEX, testRuns } from '../models';
+import { IDEMPOTENCY_KEY_UNIQUE_INDEX, testRuns } from '../models';
 
 const SINGLE_ROW_LIMIT = 1;
 const NEXT_PAGE_PROBE_ROWS = 1;
 const UNIQUE_VIOLATION_CODE = '23505';
 
-const isActiveConfigHashViolation = (error: unknown): boolean => {
+const isIdempotencyKeyViolation = (error: unknown): boolean => {
     if (!(error instanceof DrizzleQueryError)) {
         return false;
     }
@@ -27,7 +27,7 @@ const isActiveConfigHashViolation = (error: unknown): boolean => {
     return (
         cause instanceof PostgresError &&
         cause.code === UNIQUE_VIOLATION_CODE &&
-        cause.constraint_name === ACTIVE_CONFIG_HASH_UNIQUE_INDEX
+        cause.constraint_name === IDEMPOTENCY_KEY_UNIQUE_INDEX
     );
 };
 
@@ -42,27 +42,18 @@ export class TestRunsRepositoryImpl implements TestRunsRepository {
         try {
             await this.db.insert(testRuns).values(toTestRunRow(run));
         } catch (error) {
-            if (isActiveConfigHashViolation(error)) {
-                return CreateTestRunOutcome.DUPLICATE_ACTIVE;
+            if (isIdempotencyKeyViolation(error)) {
+                return CreateTestRunOutcome.IDEMPOTENCY_KEY_CONFLICT;
             }
             throw error;
         }
         return CreateTestRunOutcome.CREATED;
     }
 
-    async existsActiveWithConfigHash(userId: string, configHash: string): Promise<boolean> {
-        const [row] = await this.db
-            .select({ id: testRuns.id })
-            .from(testRuns)
-            .where(
-                and(
-                    eq(testRuns.userId, userId),
-                    eq(testRuns.configHash, configHash),
-                    inArray(testRuns.status, ACTIVE_STATUSES),
-                ),
-            )
-            .limit(SINGLE_ROW_LIMIT);
-        return row !== undefined;
+    async findByIdempotencyKey(userId: string, idempotencyKey: string): Promise<TestRun | null> {
+        return this.findOne(
+            and(eq(testRuns.userId, userId), eq(testRuns.idempotencyKey, idempotencyKey)),
+        );
     }
 
     async findById(id: string): Promise<TestRun | null> {

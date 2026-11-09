@@ -6,7 +6,7 @@ export const TestRunErrorCodes = {
     NOT_FOUND: 'TEST_RUN.NOT_FOUND',
     ALREADY_FINISHED: 'TEST_RUN.ALREADY_FINISHED',
     CAPACITY_EXCEEDED: 'TEST_RUN.CAPACITY_EXCEEDED',
-    DUPLICATE_ACTIVE: 'TEST_RUN.DUPLICATE_ACTIVE',
+    IDEMPOTENCY_KEY_REUSED: 'TEST_RUN.IDEMPOTENCY_KEY_REUSED',
     INVALID_CURSOR: ErrorCode.VALIDATION_FAILED,
 } as const;
 
@@ -17,7 +17,8 @@ export const TestRunErrorMessages: Record<TestRunErrorCode, string> = {
     [TestRunErrorCodes.NOT_FOUND]: 'Test run not found',
     [TestRunErrorCodes.ALREADY_FINISHED]: 'Test run has already finished',
     [TestRunErrorCodes.CAPACITY_EXCEEDED]: 'Too many test runs are in progress, try again later',
-    [TestRunErrorCodes.DUPLICATE_ACTIVE]: 'An identical test run is already pending or running',
+    [TestRunErrorCodes.IDEMPOTENCY_KEY_REUSED]:
+        'This idempotency key was already used for a different test config',
     [TestRunErrorCodes.INVALID_CURSOR]: 'The pagination cursor is invalid',
 };
 
@@ -26,7 +27,7 @@ export const TestRunErrorStatuses: Record<TestRunErrorCode, HttpStatus> = {
     [TestRunErrorCodes.NOT_FOUND]: HttpStatus.NOT_FOUND,
     [TestRunErrorCodes.ALREADY_FINISHED]: HttpStatus.CONFLICT,
     [TestRunErrorCodes.CAPACITY_EXCEEDED]: HttpStatus.SERVICE_UNAVAILABLE,
-    [TestRunErrorCodes.DUPLICATE_ACTIVE]: HttpStatus.CONFLICT,
+    [TestRunErrorCodes.IDEMPOTENCY_KEY_REUSED]: HttpStatus.UNPROCESSABLE_ENTITY,
     [TestRunErrorCodes.INVALID_CURSOR]: HttpStatus.BAD_REQUEST,
 };
 

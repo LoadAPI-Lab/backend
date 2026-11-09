@@ -1,5 +1,5 @@
 export const CreateTestRunOutcome = {
     CREATED: 'CREATED',
-    DUPLICATE_ACTIVE: 'DUPLICATE_ACTIVE',
+    IDEMPOTENCY_KEY_CONFLICT: 'IDEMPOTENCY_KEY_CONFLICT',
 } as const;
 export type CreateTestRunOutcome = (typeof CreateTestRunOutcome)[keyof typeof CreateTestRunOutcome];

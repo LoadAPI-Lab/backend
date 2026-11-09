@@ -31,6 +31,7 @@ import {
     StopTestRunUseCase,
     WatchTestRunUseCase,
 } from '../../../application/use-cases';
+import { IdempotencyKey } from '../../decorators';
 import { TestRunExistsGuard } from '../../guards';
 import {
     GetTestRunSwagger,
@@ -59,8 +60,9 @@ export class TestRunsController {
     start(
         @Body() dto: StartTestRunDto,
         @CurrentUser() user: AuthenticatedUser,
+        @IdempotencyKey() idempotencyKey: string | undefined,
     ): Promise<StartTestRunResponse> {
-        return this.startTestRun.execute(dto, user.id);
+        return this.startTestRun.execute(dto, user.id, idempotencyKey);
     }
 
     @Get()
@@ -87,8 +89,9 @@ export class TestRunsController {
     rerun(
         @Param() params: TestRunParamsDto,
         @CurrentUser() user: AuthenticatedUser,
+        @IdempotencyKey() idempotencyKey: string | undefined,
     ): Promise<StartTestRunResponse> {
-        return this.rerunTestRun.execute(params.id, user.id);
+        return this.rerunTestRun.execute(params.id, user.id, idempotencyKey);
     }
 
     @Post(':id/stop')

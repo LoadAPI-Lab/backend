@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { hashTestConfig } from '../../domain/config-hash';
@@ -11,9 +11,12 @@ import { TestRun } from '../../domain/test-run';
 import type { StartTestRunResponse } from '../dtos';
 
 const ENQUEUE_FAILED_REASON = 'failed to enqueue the job';
+const MISSING_CONFLICTING_RUN_MESSAGE =
+    'The idempotency key conflicted on insert but no run with this key was found';
 
 @Injectable()
 export class StartTestRunUseCase {
+    private readonly logger = new Logger(StartTestRunUseCase.name);
     private readonly maxConcurrentTests: number;
 
     constructor(
@@ -24,11 +27,18 @@ export class StartTestRunUseCase {
         this.maxConcurrentTests = configService.getOrThrow('MAX_CONCURRENT_TESTS');
     }
 
-    async execute(input: TestConfigInput, userId: string): Promise<StartTestRunResponse> {
+    async execute(
+        input: TestConfigInput,
+        userId: string,
+        idempotencyKey?: string,
+    ): Promise<StartTestRunResponse> {
         const configHash = hashTestConfig(input);
 
-        if (await this.repository.existsActiveWithConfigHash(userId, configHash)) {
-            throw testRunException(TestRunErrorCodes.DUPLICATE_ACTIVE);
+        if (idempotencyKey !== undefined) {
+            const existing = await this.repository.findByIdempotencyKey(userId, idempotencyKey);
+            if (existing) {
+                return this.replay(existing, configHash, idempotencyKey);
+            }
         }
 
         const activeRuns = await this.repository.countActive();
@@ -36,10 +46,10 @@ export class StartTestRunUseCase {
             throw testRunException(TestRunErrorCodes.CAPACITY_EXCEEDED);
         }
 
-        const run = TestRun.create({ ...input, userId, configHash });
+        const run = TestRun.create({ ...input, userId, configHash, idempotencyKey });
         const outcome = await this.repository.create(run);
-        if (outcome === CreateTestRunOutcome.DUPLICATE_ACTIVE) {
-            throw testRunException(TestRunErrorCodes.DUPLICATE_ACTIVE);
+        if (outcome === CreateTestRunOutcome.IDEMPOTENCY_KEY_CONFLICT) {
+            return this.replayConflicting(userId, configHash, idempotencyKey);
         }
 
         try {
@@ -56,5 +66,36 @@ export class StartTestRunUseCase {
         }
 
         return { id: run.id, status: run.status };
+    }
+
+    private async replayConflicting(
+        userId: string,
+        configHash: string,
+        idempotencyKey: string | undefined,
+    ): Promise<StartTestRunResponse> {
+        if (idempotencyKey === undefined) {
+            throw new Error(MISSING_CONFLICTING_RUN_MESSAGE);
+        }
+
+        const existing = await this.repository.findByIdempotencyKey(userId, idempotencyKey);
+        if (!existing) {
+            throw new Error(MISSING_CONFLICTING_RUN_MESSAGE);
+        }
+
+        return this.replay(existing, configHash, idempotencyKey);
+    }
+
+    private replay(
+        existing: TestRun,
+        configHash: string,
+        idempotencyKey: string,
+    ): StartTestRunResponse {
+        if (existing.configHash !== configHash) {
+            throw testRunException(TestRunErrorCodes.IDEMPOTENCY_KEY_REUSED);
+        }
+
+        this.logger.debug(`Replayed test run ${existing.id} for idempotency key ${idempotencyKey}`);
+
+        return { id: existing.id, status: existing.status };
     }
 }

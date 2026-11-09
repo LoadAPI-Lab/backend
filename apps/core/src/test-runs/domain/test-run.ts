@@ -12,6 +12,7 @@ interface TestRunState {
     readonly config: TestRunConfig;
     readonly createdAt: Date;
     readonly configHash?: string;
+    readonly idempotencyKey?: string;
     status: TestRunStatus;
     reason?: string;
     result?: unknown;
@@ -35,7 +36,12 @@ export class TestRun {
     private constructor(private readonly state: TestRunState) {}
 
     static create(
-        input: TestConfigInput & { userId: string; configHash: string; now?: Date },
+        input: TestConfigInput & {
+            userId: string;
+            configHash: string;
+            idempotencyKey?: string;
+            now?: Date;
+        },
     ): TestRun {
         return new TestRun({
             id: crypto.randomUUID(),
@@ -44,6 +50,7 @@ export class TestRun {
             config: input.config,
             createdAt: input.now ?? new Date(),
             configHash: input.configHash,
+            idempotencyKey: input.idempotencyKey,
             status: TestRunStatus.PENDING,
         });
     }
@@ -56,6 +63,7 @@ export class TestRun {
         config: TestRunConfig;
         createdAt: Date;
         configHash?: string;
+        idempotencyKey?: string;
         reason?: string;
         result?: unknown;
         startedAt?: Date;
@@ -96,6 +104,10 @@ export class TestRun {
 
     get configHash(): string | undefined {
         return this.state.configHash;
+    }
+
+    get idempotencyKey(): string | undefined {
+        return this.state.idempotencyKey;
     }
 
     get reason(): string | undefined {

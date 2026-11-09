@@ -1,5 +1,5 @@
 import { applyDecorators, HttpStatus, SetMetadata } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiProduces, ApiResponse } from '@nestjs/swagger';
+import { ApiBody, ApiHeader, ApiOperation, ApiProduces, ApiResponse } from '@nestjs/swagger';
 import {
     ApiConflict,
     ApiErrorResponse,
@@ -10,21 +10,38 @@ import {
 import { ZOD_RESPONSE_TOKEN } from '@shared/interceptors';
 
 import {
+    IDEMPOTENCY_KEY_HEADER,
     ListTestRunsResponseDto,
     StartTestRunDto,
     StartTestRunResponseDto,
     StopTestRunResponseDto,
     TestRunResponseDto,
 } from '../../../application/dtos';
+import { MAX_IDEMPOTENCY_KEY_LENGTH, MIN_IDEMPOTENCY_KEY_LENGTH } from '../../../domain/constants';
 import { TestRunErrorCodes, TestRunErrorMessages } from '../../../domain/errors';
+import { IDEMPOTENCY_KEY_PATTERN } from '../../../domain/schemas';
 
 export const START_TEST_RUN_HTTP_STATUS = HttpStatus.CREATED;
 
-const ApiDuplicateActiveRun = () =>
+const ApiIdempotencyKeyHeader = () =>
+    ApiHeader({
+        name: IDEMPOTENCY_KEY_HEADER,
+        required: false,
+        description:
+            'Client-generated key that makes the start safe to retry. A repeated request with the same key and the same config returns the run created by the first one instead of starting a new run; the same key with a different config is rejected with 422. Keys are scoped per user. Omit it to always start a new run.',
+        schema: {
+            type: 'string',
+            minLength: MIN_IDEMPOTENCY_KEY_LENGTH,
+            maxLength: MAX_IDEMPOTENCY_KEY_LENGTH,
+            pattern: IDEMPOTENCY_KEY_PATTERN.source,
+        },
+    });
+
+const ApiIdempotencyKeyReused = () =>
     ApiErrorResponse(
-        HttpStatus.CONFLICT,
-        TestRunErrorCodes.DUPLICATE_ACTIVE,
-        TestRunErrorMessages[TestRunErrorCodes.DUPLICATE_ACTIVE],
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        TestRunErrorCodes.IDEMPOTENCY_KEY_REUSED,
+        TestRunErrorMessages[TestRunErrorCodes.IDEMPOTENCY_KEY_REUSED],
     );
 
 export const StartTestRunSwagger = () =>
@@ -32,16 +49,18 @@ export const StartTestRunSwagger = () =>
         ApiOperation({
             summary: 'Start a test run',
             description:
-                'Validates the config, rejects it when an identical run of the user is PENDING or RUNNING, stores a PENDING run and enqueues the job.',
+                'Validates the config, stores a PENDING run and enqueues the job. With an Idempotency-Key that the user already used for the same config, returns that run instead of starting a new one.',
         }),
+        ApiIdempotencyKeyHeader(),
         ApiBody({ type: StartTestRunDto }),
         ApiResponse({
             status: START_TEST_RUN_HTTP_STATUS,
-            description: 'The test run was created and enqueued',
+            description:
+                'The test run was created and enqueued, or the run previously started with the same Idempotency-Key',
             type: StartTestRunResponseDto,
         }),
         ApiValidationError(),
-        ApiDuplicateActiveRun(),
+        ApiIdempotencyKeyReused(),
         ApiServiceUnavailable(
             'Too many test runs are in progress, or the test job could not be enqueued',
         ),
@@ -53,16 +72,18 @@ export const RerunTestRunSwagger = () =>
         ApiOperation({
             summary: 'Re-run a test run',
             description:
-                'Starts a new run with the stored config of the given run, whatever its status. Rejects it when an identical run of the user is PENDING or RUNNING, otherwise stores a PENDING run and enqueues the job.',
+                'Starts a new run with the stored config of the given run, whatever its status: stores a PENDING run and enqueues the job. With an Idempotency-Key that the user already used for the same config, returns that run instead of starting a new one.',
         }),
+        ApiIdempotencyKeyHeader(),
         ApiResponse({
             status: START_TEST_RUN_HTTP_STATUS,
-            description: 'The new test run was created and enqueued',
+            description:
+                'The new test run was created and enqueued, or the run previously started with the same Idempotency-Key',
             type: StartTestRunResponseDto,
         }),
         ApiValidationError(),
         ApiNotFound('Test run not found'),
-        ApiDuplicateActiveRun(),
+        ApiIdempotencyKeyReused(),
         ApiServiceUnavailable(
             'Too many test runs are in progress, or the test job could not be enqueued',
         ),
