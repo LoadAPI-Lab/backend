@@ -1,18 +1,18 @@
 import { HttpStatus } from '@nestjs/common';
-import { createErrorFactory, ErrorCode } from '@shared/error';
+import { createErrorFactory } from '@shared/error';
 
 export const RequestErrorCodes = {
-    INVALID_REQUEST: ErrorCode.VALIDATION_FAILED,
+    TARGET_NOT_ALLOWED: 'REQUEST.TARGET_NOT_ALLOWED',
 } as const;
 
 export type RequestErrorCode = (typeof RequestErrorCodes)[keyof typeof RequestErrorCodes];
 
 export const RequestErrorMessages: Record<RequestErrorCode, string> = {
-    [RequestErrorCodes.INVALID_REQUEST]: 'The request data failed validation',
+    [RequestErrorCodes.TARGET_NOT_ALLOWED]: 'The target address is not allowed',
 };
 
 export const RequestErrorStatuses: Record<RequestErrorCode, HttpStatus> = {
-    [RequestErrorCodes.INVALID_REQUEST]: HttpStatus.BAD_REQUEST,
+    [RequestErrorCodes.TARGET_NOT_ALLOWED]: HttpStatus.BAD_REQUEST,
 };
 
 export const requestException = createErrorFactory(RequestErrorMessages, RequestErrorStatuses);

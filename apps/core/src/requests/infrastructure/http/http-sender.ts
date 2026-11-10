@@ -11,8 +11,10 @@ import {
     RequestOutcomeKind,
     SEND_ERROR_MESSAGES,
 } from '../../domain/constants';
+import { RequestErrorCodes, requestException } from '../../domain/errors';
 import { HttpSender } from '../../domain/ports';
 import type { FailedRequest, ReceivedResponse, RequestOutcome } from '../../domain/request-outcome';
+import { OutboundTargetGuard, TargetNotAllowedError } from './outbound-target-guard';
 import { isTextContent, toResponseHeaders } from './response-content';
 import { classifySendError } from './send-error-classification';
 
@@ -53,14 +55,21 @@ const decodeText = (bytes: Buffer, truncated: boolean): string =>
 @Injectable()
 export class HttpSenderImpl implements HttpSender, OnModuleDestroy {
     private readonly timeoutMs: number;
+    private readonly targetGuard?: OutboundTargetGuard;
     private readonly agent: Agent;
 
     constructor(configService: ConfigService) {
         this.timeoutMs = configService.getOrThrow('SINGLE_REQUEST_TIMEOUT_MS');
+        if (!configService.getOrThrow('OUTBOUND_ALLOW_PRIVATE_NETWORKS')) {
+            this.targetGuard = new OutboundTargetGuard(
+                configService.getOrThrow('OUTBOUND_ALLOWED_HOSTS'),
+            );
+        }
         this.agent = new Agent({
             connectTimeout: this.timeoutMs,
             headersTimeout: this.timeoutMs,
             bodyTimeout: this.timeoutMs,
+            ...(this.targetGuard && { connect: { lookup: this.targetGuard.lookup } }),
         });
     }
 
@@ -72,6 +81,7 @@ export class HttpSenderImpl implements HttpSender, OnModuleDestroy {
         const startedAt = performance.now();
 
         try {
+            this.targetGuard?.assertAllowedUrl(httpRequest.url);
             const response = await request(httpRequest.url, {
                 dispatcher: this.agent,
                 method: httpRequest.method,
@@ -102,6 +112,9 @@ export class HttpSenderImpl implements HttpSender, OnModuleDestroy {
             };
             return received;
         } catch (error) {
+            if (error instanceof TargetNotAllowedError) {
+                throw requestException(RequestErrorCodes.TARGET_NOT_ALLOWED);
+            }
             const category = classifySendError(error);
             const failed: FailedRequest = {
                 kind: RequestOutcomeKind.ERROR,

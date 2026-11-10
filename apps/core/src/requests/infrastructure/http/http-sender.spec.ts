@@ -1,24 +1,46 @@
 import { createServer, type RequestListener, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+import type { Config } from '@libs/config';
+import { HttpStatus } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { HttpMethod } from '@shared/constants';
+import { BaseException } from '@shared/error';
 
 import {
     MAX_RESPONSE_BODY_BYTES,
     RequestOutcomeKind,
     SendErrorCategory,
 } from '../../domain/constants';
+import { RequestErrorCodes, RequestErrorMessages } from '../../domain/errors';
 import type { RequestOutcome } from '../../domain/request-outcome';
 import { HttpSenderImpl } from './http-sender';
 
 const DEFAULT_TIMEOUT_MS = 2000;
 const SHORT_TIMEOUT_MS = 200;
 const LOCALHOST = '127.0.0.1';
+const LOCALHOST_NAME = 'localhost';
 const EXTRA_BYTES = 100;
 
-const configWithTimeout = (timeoutMs: number): ConfigService =>
-    ({ getOrThrow: () => timeoutMs }) as unknown as ConfigService;
+type SenderConfig = Pick<
+    Config,
+    'SINGLE_REQUEST_TIMEOUT_MS' | 'OUTBOUND_ALLOW_PRIVATE_NETWORKS' | 'OUTBOUND_ALLOWED_HOSTS'
+>;
+
+const DEFAULT_CONFIG: SenderConfig = {
+    SINGLE_REQUEST_TIMEOUT_MS: DEFAULT_TIMEOUT_MS,
+    OUTBOUND_ALLOW_PRIVATE_NETWORKS: true,
+    OUTBOUND_ALLOWED_HOSTS: [],
+};
+
+const PRIVATE_NETWORKS_DENIED: Partial<SenderConfig> = { OUTBOUND_ALLOW_PRIVATE_NETWORKS: false };
+
+const createConfig = (overrides: Partial<SenderConfig> = {}): ConfigService => {
+    const values: SenderConfig = { ...DEFAULT_CONFIG, ...overrides };
+    return {
+        getOrThrow: (key: keyof SenderConfig) => values[key],
+    } as unknown as ConfigService;
+};
 
 const listen = (server: Server): Promise<string> =>
     new Promise((resolve) => {
@@ -41,6 +63,16 @@ function expectResponse(outcome: RequestOutcome) {
     return outcome;
 }
 
+function expectTargetNotAllowed(error: unknown) {
+    expect(error).toBeInstanceOf(BaseException);
+    const exception = error as BaseException;
+    expect(exception.getStatus()).toBe(HttpStatus.BAD_REQUEST);
+    expect(exception.getResponse()).toMatchObject({
+        code: RequestErrorCodes.TARGET_NOT_ALLOWED,
+        message: RequestErrorMessages[RequestErrorCodes.TARGET_NOT_ALLOWED],
+    });
+}
+
 function expectError(outcome: RequestOutcome) {
     if (outcome.kind !== RequestOutcomeKind.ERROR) {
         throw new Error(`expected an error, got status ${outcome.status}`);
@@ -51,14 +83,28 @@ function expectError(outcome: RequestOutcome) {
 describe('HttpSenderImpl', () => {
     let server: Server | undefined;
     let sender: HttpSenderImpl;
+    let connections: number;
 
     const serve = async (listener: RequestListener): Promise<string> => {
         server = createServer(listener);
+        server.on('connection', () => {
+            connections += 1;
+        });
         return listen(server);
     };
 
+    const replaceSender = async (overrides: Partial<SenderConfig>): Promise<void> => {
+        await sender.onModuleDestroy();
+        sender = new HttpSenderImpl(createConfig(overrides));
+    };
+
+    const respondOk: RequestListener = (_request, response) => {
+        response.end('ok');
+    };
+
     beforeEach(() => {
-        sender = new HttpSenderImpl(configWithTimeout(DEFAULT_TIMEOUT_MS));
+        connections = 0;
+        sender = new HttpSenderImpl(createConfig());
     });
 
     afterEach(async () => {
@@ -141,8 +187,7 @@ describe('HttpSenderImpl', () => {
     });
 
     it('returns a timeout error when the target does not respond in time', async () => {
-        await sender.onModuleDestroy();
-        sender = new HttpSenderImpl(configWithTimeout(SHORT_TIMEOUT_MS));
+        await replaceSender({ SINGLE_REQUEST_TIMEOUT_MS: SHORT_TIMEOUT_MS });
         const url = await serve(() => {});
 
         const outcome = expectError(await sender.send({ method: HttpMethod.GET, url }));
@@ -159,5 +204,51 @@ describe('HttpSenderImpl', () => {
         const outcome = expectError(await sender.send({ method: HttpMethod.GET, url }));
 
         expect(outcome.error.category).toBe(SendErrorCategory.CONNECTION_REFUSED);
+    });
+
+    it('rejects an IP literal in a private network without contacting it', async () => {
+        await replaceSender(PRIVATE_NETWORKS_DENIED);
+        const url = await serve(respondOk);
+
+        const rejection: unknown = await sender
+            .send({ method: HttpMethod.GET, url })
+            .catch((error: unknown) => error);
+
+        expectTargetNotAllowed(rejection);
+        expect(connections).toBe(0);
+    });
+
+    it('rejects a host name that resolves to loopback without contacting it', async () => {
+        await replaceSender(PRIVATE_NETWORKS_DENIED);
+        const localUrl = await serve(respondOk);
+        const url = localUrl.replace(LOCALHOST, LOCALHOST_NAME);
+
+        const rejection: unknown = await sender
+            .send({ method: HttpMethod.GET, url })
+            .catch((error: unknown) => error);
+
+        expectTargetNotAllowed(rejection);
+        expect(connections).toBe(0);
+    });
+
+    it('sends to a private host listed in the allowed hosts', async () => {
+        await replaceSender({
+            ...PRIVATE_NETWORKS_DENIED,
+            OUTBOUND_ALLOWED_HOSTS: [LOCALHOST_NAME],
+        });
+        const localUrl = await serve(respondOk);
+        const url = localUrl.replace(LOCALHOST, LOCALHOST_NAME);
+
+        const outcome = expectResponse(await sender.send({ method: HttpMethod.GET, url }));
+
+        expect(outcome.status).toBe(200);
+    });
+
+    it('sends to a private address when private networks are allowed', async () => {
+        const url = await serve(respondOk);
+
+        const outcome = expectResponse(await sender.send({ method: HttpMethod.GET, url }));
+
+        expect(outcome.status).toBe(200);
     });
 });

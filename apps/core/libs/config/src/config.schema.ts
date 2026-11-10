@@ -57,6 +57,16 @@ export const ConfigSchema = z.object({
     WORKER_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
     WATCHDOG_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
     SINGLE_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+    OUTBOUND_ALLOW_PRIVATE_NETWORKS: z.stringbool().default(false),
+    OUTBOUND_ALLOWED_HOSTS: z
+        .string()
+        .default('')
+        .transform((value) =>
+            value
+                .split(',')
+                .map((host) => host.trim().toLowerCase())
+                .filter(Boolean),
+        ),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

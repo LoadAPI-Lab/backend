@@ -14,7 +14,11 @@ import {
     SEND_REQUEST_RATE_LIMIT_TTL_MS,
     SendErrorCategory,
 } from '../../../domain/constants';
-import { REQUEST_BODY_VIOLATION_MESSAGES, RequestBodyViolation } from '../../../domain/errors';
+import {
+    REQUEST_BODY_VIOLATION_MESSAGES,
+    RequestBodyViolation,
+    RequestErrorCodes,
+} from '../../../domain/errors';
 
 const SECOND_MS = 1000;
 
@@ -25,6 +29,7 @@ const SEND_REQUEST_DESCRIPTION = [
     `The response body is read up to ${MAX_RESPONSE_BODY_BYTES} bytes and returned as text for text content types; other content types are marked as binary without a body.`,
     'Network errors of the target are returned with status 200 and kind "error"; responses of the target with any status are returned with kind "response".',
     'The timeout is set by SINGLE_REQUEST_TIMEOUT_MS and covers connecting, headers and body.',
+    `Targets in private, loopback, link-local and other internal networks are rejected with 400 ${RequestErrorCodes.TARGET_NOT_ALLOWED} unless OUTBOUND_ALLOW_PRIVATE_NETWORKS is enabled or the host is listed in OUTBOUND_ALLOWED_HOSTS.`,
 ].join(' ');
 
 const RESPONSE_EXAMPLE = {
