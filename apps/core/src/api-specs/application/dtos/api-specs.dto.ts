@@ -1,12 +1,8 @@
+import { HTTP_METHODS } from '@shared/constants';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod/v4';
 
-import {
-    API_SPEC_METHODS,
-    BODY_FIELD_TYPES,
-    NAME_MAX_LENGTH,
-    PARAMETER_LOCATIONS,
-} from '../../domain/constants';
+import { BODY_FIELD_TYPES, NAME_MAX_LENGTH, PARAMETER_LOCATIONS } from '../../domain/constants';
 
 const apiSpecIdSchema = z.uuid().describe('API spec id');
 const nameSchema = z
@@ -118,7 +114,7 @@ const responseSchema = z.object({
 const endpointSchema = z.object({
     id: z.string().describe('Stable endpoint id derived from the key'),
     key: z.string().describe('"METHOD path"'),
-    method: z.enum(API_SPEC_METHODS).describe('HTTP method'),
+    method: z.enum(HTTP_METHODS).describe('HTTP method'),
     path: z.string().describe('Path template'),
     summary: z.string().optional(),
     description: z.string().optional(),

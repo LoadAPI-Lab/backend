@@ -1,6 +1,7 @@
+import { HTTP_METHODS } from '@shared/constants';
 import { z } from 'zod/v4';
 
-import { HTTP_METHODS, STEP_STATUSES } from '../constants';
+import { STEP_STATUSES } from '../constants';
 
 const percentilesSchema = (subject: string) =>
     z

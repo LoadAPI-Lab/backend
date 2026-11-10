@@ -1,4 +1,6 @@
-import { HttpMethod, MAX_TARGET_RPS } from '../constants';
+import { HttpMethod } from '@shared/constants';
+
+import { MAX_TARGET_RPS } from '../constants';
 import { singleConfigSchema } from './single-config.schema';
 
 const TARGET = { method: HttpMethod.GET, url: 'https://api.example.com/users' };

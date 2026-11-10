@@ -1,3 +1,4 @@
+import { HTTP_METHODS } from '@shared/constants';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod/v4';
 
@@ -6,7 +7,6 @@ import {
     MAX_PAGE_LIMIT,
     MIN_PAGE_LIMIT,
     TEST_RUN_STATUSES,
-    HTTP_METHODS,
     TEST_TYPES,
 } from '../../domain/constants';
 import {

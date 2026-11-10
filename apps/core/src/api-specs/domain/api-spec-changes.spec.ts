@@ -1,11 +1,13 @@
+import { HttpMethod } from '@shared/constants';
+
 import { summarizeEndpointChanges } from './api-spec-changes';
 import type { ApiSpecEndpoint } from './api-spec-document';
-import { ApiSpecMethod, ParameterLocation } from './constants';
+import { ParameterLocation } from './constants';
 
 type EndpointOverrides = Partial<Omit<ApiSpecEndpoint, 'id' | 'key' | 'method' | 'path'>>;
 
 const endpoint = (
-    method: ApiSpecMethod,
+    method: HttpMethod,
     path: string,
     overrides: EndpointOverrides = {},
 ): ApiSpecEndpoint => ({
@@ -22,16 +24,16 @@ const endpoint = (
 describe('summarizeEndpointChanges', () => {
     it('detects added, changed and removed endpoints', () => {
         const previous = [
-            endpoint(ApiSpecMethod.GET, '/orders'),
-            endpoint(ApiSpecMethod.DELETE, '/orders/{id}'),
-            endpoint(ApiSpecMethod.GET, '/users'),
+            endpoint(HttpMethod.GET, '/orders'),
+            endpoint(HttpMethod.DELETE, '/orders/{id}'),
+            endpoint(HttpMethod.GET, '/users'),
         ];
         const next = [
-            endpoint(ApiSpecMethod.GET, '/orders', {
+            endpoint(HttpMethod.GET, '/orders', {
                 responses: [{ status: '201', description: 'Created' }],
             }),
-            endpoint(ApiSpecMethod.GET, '/users'),
-            endpoint(ApiSpecMethod.POST, '/orders'),
+            endpoint(HttpMethod.GET, '/users'),
+            endpoint(HttpMethod.POST, '/orders'),
         ];
 
         expect(summarizeEndpointChanges(previous, next)).toEqual({
@@ -43,16 +45,16 @@ describe('summarizeEndpointChanges', () => {
 
     it('detects changed parameters and request bodies', () => {
         const previous = [
-            endpoint(ApiSpecMethod.GET, '/orders'),
-            endpoint(ApiSpecMethod.POST, '/orders'),
+            endpoint(HttpMethod.GET, '/orders'),
+            endpoint(HttpMethod.POST, '/orders'),
         ];
         const next = [
-            endpoint(ApiSpecMethod.GET, '/orders', {
+            endpoint(HttpMethod.GET, '/orders', {
                 parameters: [
                     { name: 'limit', in: ParameterLocation.QUERY, required: false, schema: {} },
                 ],
             }),
-            endpoint(ApiSpecMethod.POST, '/orders', {
+            endpoint(HttpMethod.POST, '/orders', {
                 requestBody: { required: true, contentType: 'application/json' },
             }),
         ];
@@ -65,7 +67,7 @@ describe('summarizeEndpointChanges', () => {
 
     it('does not treat objects with the same values in a different key order as changed', () => {
         const previous = [
-            endpoint(ApiSpecMethod.POST, '/orders', {
+            endpoint(HttpMethod.POST, '/orders', {
                 parameters: [
                     {
                         name: 'limit',
@@ -79,7 +81,7 @@ describe('summarizeEndpointChanges', () => {
             }),
         ];
         const next = [
-            endpoint(ApiSpecMethod.POST, '/orders', {
+            endpoint(HttpMethod.POST, '/orders', {
                 responses: [{ description: 'OK', status: '200' }],
                 requestBody: { example: '{}', contentType: 'application/json', required: true },
                 parameters: [
@@ -101,9 +103,9 @@ describe('summarizeEndpointChanges', () => {
     });
 
     it('ignores changes of summary, description, tags and deprecated', () => {
-        const previous = [endpoint(ApiSpecMethod.GET, '/orders', { summary: 'List', tags: ['a'] })];
+        const previous = [endpoint(HttpMethod.GET, '/orders', { summary: 'List', tags: ['a'] })];
         const next = [
-            endpoint(ApiSpecMethod.GET, '/orders', {
+            endpoint(HttpMethod.GET, '/orders', {
                 summary: 'List orders',
                 description: 'Lists all orders',
                 tags: ['b'],
@@ -116,17 +118,17 @@ describe('summarizeEndpointChanges', () => {
 
     it('orders added and changed by the new document and removed by the old document', () => {
         const previous = [
-            endpoint(ApiSpecMethod.GET, '/b'),
-            endpoint(ApiSpecMethod.GET, '/x'),
-            endpoint(ApiSpecMethod.GET, '/a'),
-            endpoint(ApiSpecMethod.GET, '/y'),
+            endpoint(HttpMethod.GET, '/b'),
+            endpoint(HttpMethod.GET, '/x'),
+            endpoint(HttpMethod.GET, '/a'),
+            endpoint(HttpMethod.GET, '/y'),
         ];
         const changedResponses = { responses: [] };
         const next = [
-            endpoint(ApiSpecMethod.GET, '/d'),
-            endpoint(ApiSpecMethod.GET, '/a', changedResponses),
-            endpoint(ApiSpecMethod.GET, '/c'),
-            endpoint(ApiSpecMethod.GET, '/b', changedResponses),
+            endpoint(HttpMethod.GET, '/d'),
+            endpoint(HttpMethod.GET, '/a', changedResponses),
+            endpoint(HttpMethod.GET, '/c'),
+            endpoint(HttpMethod.GET, '/b', changedResponses),
         ];
 
         expect(summarizeEndpointChanges(previous, next)).toEqual({

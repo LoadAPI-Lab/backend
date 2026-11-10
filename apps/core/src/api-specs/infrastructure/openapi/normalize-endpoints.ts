@@ -1,5 +1,6 @@
+import { HttpMethod } from '@shared/constants';
+
 import type { ApiSpecEndpoint, ApiSpecEndpointResponse } from '../../domain/api-spec-document';
-import { ApiSpecMethod } from '../../domain/constants';
 import { asNode, asString, type DocumentNode, isExtensionKey } from './document-values';
 import { endpointId } from './endpoint-id';
 import { resolveReferences } from './json-pointer';
@@ -11,14 +12,14 @@ import {
 import { normalizeRequestBody } from './normalize-request-body';
 import type { ResponseOrder } from './spec-source';
 
-const OPERATION_METHODS: ReadonlyMap<string, ApiSpecMethod> = new Map([
-    ['get', ApiSpecMethod.GET],
-    ['put', ApiSpecMethod.PUT],
-    ['post', ApiSpecMethod.POST],
-    ['delete', ApiSpecMethod.DELETE],
-    ['options', ApiSpecMethod.OPTIONS],
-    ['head', ApiSpecMethod.HEAD],
-    ['patch', ApiSpecMethod.PATCH],
+const OPERATION_METHODS: ReadonlyMap<string, HttpMethod> = new Map([
+    ['get', HttpMethod.GET],
+    ['put', HttpMethod.PUT],
+    ['post', HttpMethod.POST],
+    ['delete', HttpMethod.DELETE],
+    ['options', HttpMethod.OPTIONS],
+    ['head', HttpMethod.HEAD],
+    ['patch', HttpMethod.PATCH],
 ]);
 
 interface OperationContext {
@@ -54,7 +55,7 @@ const toTags = (value: unknown): string[] =>
 
 interface OperationEntry {
     readonly field: string;
-    readonly method: ApiSpecMethod;
+    readonly method: HttpMethod;
     readonly operation: DocumentNode;
 }
 

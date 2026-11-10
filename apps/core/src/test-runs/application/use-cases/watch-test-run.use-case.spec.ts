@@ -1,8 +1,9 @@
 import { HttpStatus, Logger } from '@nestjs/common';
+import { HttpMethod } from '@shared/constants';
 import { BaseException } from '@shared/error';
 import { firstValueFrom, type Observable, Subject, toArray } from 'rxjs';
 
-import { HttpMethod, LiveEventType, TestRunStatus, TestType } from '../../domain/constants';
+import { LiveEventType, TestRunStatus, TestType } from '../../domain/constants';
 import { TestRunErrorCodes } from '../../domain/errors';
 import type { LiveEvent, LiveFeed, SnapshotHistory } from '../../domain/ports';
 import { TestRun } from '../../domain/test-run';

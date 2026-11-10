@@ -1,4 +1,5 @@
-import { HttpMethod } from '../constants';
+import { HttpMethod } from '@shared/constants';
+
 import { targetSchema } from './target.schema';
 
 describe('targetSchema', () => {
