@@ -56,6 +56,7 @@ export const ConfigSchema = z.object({
     RUNNING_GRACE_MS: z.coerce.number().int().positive().default(30_000),
     WORKER_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
     WATCHDOG_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
+    SINGLE_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
