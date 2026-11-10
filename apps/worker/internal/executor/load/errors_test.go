@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"testing"
 	"time"
+	"worker/internal/httpclient"
 )
 
 func TestClassifyError(t *testing.T) {
@@ -67,6 +68,16 @@ func TestClassifyError(t *testing.T) {
 				return err
 			},
 			want: ErrorConnectionReset,
+		},
+		{
+			name: "blocked",
+			request: func(t *testing.T) error {
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+				t.Cleanup(server.Close)
+				_, err := httpclient.New().Get(server.URL)
+				return err
+			},
+			want: ErrorBlocked,
 		},
 		{
 			name: "other",

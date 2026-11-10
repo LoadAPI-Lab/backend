@@ -2,6 +2,7 @@ package scenario
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -53,7 +54,7 @@ func (e *Executor) Run(ctx context.Context) (any, error) {
 				Status:      StepStatusFailed,
 				StatusCode:  statusCode,
 				DurationMs:  durationMs,
-				Description: err.Error(),
+				Description: requestErrorDescription(err),
 			})
 			continue
 		}
@@ -108,6 +109,13 @@ func (e *Executor) doRequest(ctx context.Context, target job.Target) (int, []byt
 	}
 
 	return resp.StatusCode, respBody, nil
+}
+
+func requestErrorDescription(err error) string {
+	if errors.Is(err, httpclient.ErrTargetNotAllowed) {
+		return httpclient.ErrTargetNotAllowed.Error()
+	}
+	return err.Error()
 }
 
 func resolveTarget(target job.Target, vars map[string]string) job.Target {

@@ -6,9 +6,14 @@ import (
 	"io"
 	"net"
 	"syscall"
+	"worker/internal/httpclient"
 )
 
 func ClassifyError(err error) NetworkError {
+	if errors.Is(err, httpclient.ErrTargetNotAllowed) {
+		return ErrorBlocked
+	}
+
 	var dnsErr *net.DNSError
 	if errors.As(err, &dnsErr) {
 		return ErrorDNS

@@ -36,5 +36,6 @@ const (
 	ErrorConnectionRefused NetworkError = "connection_refused"
 	ErrorConnectionReset   NetworkError = "connection_reset"
 	ErrorDNS               NetworkError = "dns"
+	ErrorBlocked           NetworkError = "blocked"
 	ErrorOther             NetworkError = "other"
 )
