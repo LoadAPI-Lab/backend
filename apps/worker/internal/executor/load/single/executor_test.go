@@ -13,6 +13,7 @@ import (
 	"time"
 	"worker/internal/executor/load"
 	"worker/internal/job"
+	"worker/internal/neterror"
 )
 
 type recordingPublisher struct {
@@ -166,7 +167,7 @@ func TestRunCountsNetworkErrors(t *testing.T) {
 
 	route, _ := runSingle(t, context.Background(), cfg)
 
-	want := map[load.NetworkError]int{load.ErrorConnectionRefused: 10}
+	want := map[neterror.Category]int{neterror.ConnectionRefused: 10}
 	if !maps.Equal(route.Errors, want) {
 		t.Errorf("Errors = %v, want %v", route.Errors, want)
 	}

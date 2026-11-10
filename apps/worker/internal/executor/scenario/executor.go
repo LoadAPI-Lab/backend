@@ -13,10 +13,13 @@ import (
 	"worker/internal/httpclient"
 	"worker/internal/job"
 	"worker/internal/metrics"
+	"worker/internal/neterror"
 	"worker/internal/template"
 )
 
 const maxResponseBytes = 10 << 20
+
+var errInvalidRequest = errors.New("invalid request")
 
 func New(testId string, cfg Config) *Executor {
 	return &Executor{
@@ -90,7 +93,7 @@ func (e *Executor) Run(ctx context.Context) (any, error) {
 func (e *Executor) doRequest(ctx context.Context, target job.Target) (int, []byte, error) {
 	req, err := http.NewRequestWithContext(ctx, target.Method, target.URL, strings.NewReader(target.Body))
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, errInvalidRequest
 	}
 
 	for k, v := range target.Headers {
@@ -112,10 +115,14 @@ func (e *Executor) doRequest(ctx context.Context, target job.Target) (int, []byt
 }
 
 func requestErrorDescription(err error) string {
-	if errors.Is(err, httpclient.ErrTargetNotAllowed) {
+	if errors.Is(err, errInvalidRequest) {
+		return errInvalidRequest.Error()
+	}
+	category := neterror.Classify(err)
+	if category == neterror.Blocked {
 		return httpclient.ErrTargetNotAllowed.Error()
 	}
-	return err.Error()
+	return "network error: " + string(category)
 }
 
 func resolveTarget(target job.Target, vars map[string]string) job.Target {

@@ -1,5 +1,7 @@
 package load
 
+import "worker/internal/neterror"
+
 type Result struct {
 	DurationMs float64       `json:"durationMs"`
 	TargetRps  int           `json:"targetRps"`
@@ -8,15 +10,15 @@ type Result struct {
 }
 
 type RouteResult struct {
-	Method        string               `json:"method"`
-	URL           string               `json:"url"`
-	TotalRequests int                  `json:"totalRequests"`
-	SuccessCount  int                  `json:"successCount"`
-	ErrorCount    int                  `json:"errorCount"`
-	ErrorRate     float64              `json:"errorRate"`
-	LateCount     int                  `json:"lateCount"`
-	ResponseTime  *Percentiles         `json:"responseTime,omitempty"`
-	ServiceTime   *Percentiles         `json:"serviceTime,omitempty"`
-	StatusCodes   map[int]int          `json:"statusCodes,omitempty"`
-	Errors        map[NetworkError]int `json:"errors,omitempty"`
+	Method        string                    `json:"method"`
+	URL           string                    `json:"url"`
+	TotalRequests int                       `json:"totalRequests"`
+	SuccessCount  int                       `json:"successCount"`
+	ErrorCount    int                       `json:"errorCount"`
+	ErrorRate     float64                   `json:"errorRate"`
+	LateCount     int                       `json:"lateCount"`
+	ResponseTime  *Percentiles              `json:"responseTime,omitempty"`
+	ServiceTime   *Percentiles              `json:"serviceTime,omitempty"`
+	StatusCodes   map[int]int               `json:"statusCodes,omitempty"`
+	Errors        map[neterror.Category]int `json:"errors,omitempty"`
 }

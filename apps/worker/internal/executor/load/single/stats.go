@@ -1,8 +1,8 @@
 package single
 
 import (
-	"worker/internal/executor/load"
 	"worker/internal/metrics"
+	"worker/internal/neterror"
 )
 
 type stats struct {
@@ -10,7 +10,7 @@ type stats struct {
 	failed        int
 	late          int
 	statusCodes   map[int]int
-	errors        map[load.NetworkError]int
+	errors        map[neterror.Category]int
 	responseTimes *metrics.LatencyWindow
 	serviceTimes  *metrics.LatencyWindow
 }
@@ -18,7 +18,7 @@ type stats struct {
 func newStats() *stats {
 	return &stats{
 		statusCodes:   make(map[int]int),
-		errors:        make(map[load.NetworkError]int),
+		errors:        make(map[neterror.Category]int),
 		responseTimes: metrics.NewLatencyWindow(),
 		serviceTimes:  metrics.NewLatencyWindow(),
 	}
@@ -31,7 +31,7 @@ func (s *stats) add(r requestResult) {
 
 	if r.err != nil {
 		s.failed++
-		s.errors[load.ClassifyError(r.err)]++
+		s.errors[neterror.Classify(r.err)]++
 		return
 	}
 

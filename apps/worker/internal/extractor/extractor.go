@@ -3,10 +3,13 @@ package extractor
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 )
+
+var errInvalidJSON = errors.New("response is not valid JSON")
 
 func Extract(body []byte, path string) (string, error) {
 	decoder := json.NewDecoder(bytes.NewReader(body))
@@ -14,7 +17,7 @@ func Extract(body []byte, path string) (string, error) {
 
 	var node any
 	if err := decoder.Decode(&node); err != nil {
-		return "", fmt.Errorf("response is not valid JSON: %w", err)
+		return "", errInvalidJSON
 	}
 
 	for _, segment := range strings.Split(path, ".") {
