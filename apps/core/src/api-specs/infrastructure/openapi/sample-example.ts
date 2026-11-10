@@ -1,18 +1,10 @@
-import type { JSONSchema7 } from 'json-schema';
-import { sample } from 'openapi-sampler';
-
-import { MAX_GENERATED_EXAMPLE_BYTES, MAX_SAMPLE_DEPTH } from '../../domain/constants';
+import { MAX_GENERATED_EXAMPLE_BYTES } from '../../domain/constants';
 import { asNode, type DocumentNode } from './document-values';
-
-const SAMPLER_OPTIONS = {
-    skipReadOnly: true,
-    quiet: true,
-    maxSampleDepth: MAX_SAMPLE_DEPTH,
-} as const;
+import { exampleFromSchema } from './schema-example';
 
 const sampleValue = (schema: DocumentNode, root: DocumentNode): unknown => {
     try {
-        return sample(schema as JSONSchema7, SAMPLER_OPTIONS, root);
+        return exampleFromSchema(schema, { root, today: new Date() });
     } catch {
         return undefined;
     }
