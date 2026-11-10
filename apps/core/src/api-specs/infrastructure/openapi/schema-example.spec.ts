@@ -159,11 +159,11 @@ describe('exampleFromSchema', () => {
     it('adds no entry for additionalProperties set to true', () => {
         const schema = {
             type: 'object',
-            properties: { a: { type: 'integer' } },
+            properties: { count: { type: 'integer' } },
             additionalProperties: true,
         };
 
-        expect(generate(schema)).toEqual({ a: 1 });
+        expect(generate(schema)).toEqual({ count: 1 });
     });
 
     it('follows $ref', () => {

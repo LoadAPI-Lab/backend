@@ -205,12 +205,12 @@ const stringValue = (node: DocumentNode, slot: Slot, state: WalkState): string =
     return plainText(node);
 };
 
-const childSlot = (
-    shape: Shape,
-    slot: Slot,
-    name: string | undefined,
-    property: boolean,
-): Slot => ({
+interface ChildOptions {
+    readonly name?: string;
+    readonly property: boolean;
+}
+
+const childSlot = (shape: Shape, slot: Slot, { name, property }: ChildOptions): Slot => ({
     ...(name !== undefined && { name }),
     property,
     depth: slot.depth + 1,
@@ -262,14 +262,14 @@ const valueOf = (schema: unknown, slot: Slot, state: WalkState): unknown => {
 function objectValue(shape: Shape, slot: Slot, state: WalkState): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const [name, schema] of Object.entries(asNode(shape.node['properties']) ?? {})) {
-        const value = valueOf(schema, childSlot(shape, slot, name, true), state);
+        const value = valueOf(schema, childSlot(shape, slot, { name, property: true }), state);
         if (value !== undefined) {
             result[name] = value;
         }
     }
     const extra = asNode(shape.node['additionalProperties']);
     if (extra && !(MAP_KEY in result)) {
-        const value = valueOf(extra, childSlot(shape, slot, undefined, false), state);
+        const value = valueOf(extra, childSlot(shape, slot, { property: false }), state);
         if (value !== undefined) {
             result[MAP_KEY] = value;
         }
@@ -278,7 +278,14 @@ function objectValue(shape: Shape, slot: Slot, state: WalkState): Record<string,
 }
 
 function arrayValue(shape: Shape, slot: Slot, state: WalkState): unknown[] {
-    const item = valueOf(shape.node['items'], childSlot(shape, slot, slot.name, false), state);
+    const item = valueOf(
+        shape.node['items'],
+        childSlot(shape, slot, {
+            ...(slot.name !== undefined && { name: slot.name }),
+            property: false,
+        }),
+        state,
+    );
     if (item === undefined) {
         return [];
     }
