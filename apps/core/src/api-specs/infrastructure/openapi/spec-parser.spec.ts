@@ -633,12 +633,7 @@ describe('SpecParserImpl', () => {
         const value: unknown = JSON.parse(example);
 
         expect(example).toBe(JSON.stringify(value, undefined, 2));
-        expect(value).toEqual({
-            productId: expect.stringMatching(
-                /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/,
-            ),
-            quantity: expect.any(Number),
-        });
+        expect(value).toEqual({ productId: '{{$uuid}}', quantity: 1 });
     });
 
     it('leaves read-only properties out of a generated example', async () => {
@@ -652,7 +647,7 @@ describe('SpecParserImpl', () => {
 
         const example: unknown = JSON.parse(endpoint.requestBody?.example ?? '{}');
 
-        expect(example).toEqual({ note: 'string' });
+        expect(example).toEqual({ note: 'example' });
     });
 
     it('finishes on a circular schema', async () => {
