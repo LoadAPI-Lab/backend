@@ -1,5 +1,7 @@
+import { HttpMethod } from '@shared/constants';
+
 import { hashTestConfig } from './config-hash';
-import { HttpMethod, TestType } from './constants';
+import { TestType } from './constants';
 
 const URL = 'https://api.example.com/users';
 

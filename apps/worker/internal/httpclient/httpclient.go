@@ -9,11 +9,10 @@ import (
 
 func New() *http.Client {
 	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
+		DialContext: guardedDial(&net.Dialer{
 			Timeout:   5 * time.Second,
 			KeepAlive: 30 * time.Second,
-		}).DialContext,
+		}),
 		MaxIdleConns:        0,
 		MaxIdleConnsPerHost: 1024,
 		IdleConnTimeout:     90 * time.Second,

@@ -1,4 +1,6 @@
-import { HttpMethod, TestRunStatus, TestType } from '../../domain/constants';
+import { HttpMethod } from '@shared/constants';
+
+import { TestRunStatus, TestType } from '../../domain/constants';
 import { TestRun } from '../../domain/test-run';
 import { InMemoryTestRunsRepository } from '../../testing';
 import { ListTestRunsUseCase } from './list-test-runs.use-case';

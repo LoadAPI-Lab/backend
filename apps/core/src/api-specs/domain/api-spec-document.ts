@@ -1,4 +1,6 @@
-import type { ApiSpecMethod, BodyFieldType, ParameterLocation } from './constants';
+import type { HttpMethod } from '@shared/constants';
+
+import type { BodyFieldType, ParameterLocation } from './constants';
 
 export interface ApiSpecServerVariable {
     readonly default: string;
@@ -52,7 +54,7 @@ export interface ApiSpecEndpointResponse {
 export interface ApiSpecEndpoint {
     readonly id: string;
     readonly key: string;
-    readonly method: ApiSpecMethod;
+    readonly method: HttpMethod;
     readonly path: string;
     readonly summary?: string;
     readonly description?: string;

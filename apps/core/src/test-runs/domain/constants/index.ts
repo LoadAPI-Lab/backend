@@ -1,6 +1,5 @@
 export * from './create-test-run-outcome';
 export * from './failure-reason';
-export * from './http-methods';
 export * from './limits';
 export * from './live-event-type';
 export * from './secret-names';

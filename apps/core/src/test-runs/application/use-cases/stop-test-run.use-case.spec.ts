@@ -1,6 +1,7 @@
+import { HttpMethod } from '@shared/constants';
 import { isBaseExceptionWithCode } from '@shared/error';
 
-import { HttpMethod, TestRunStatus, TestType } from '../../domain/constants';
+import { TestRunStatus, TestType } from '../../domain/constants';
 import { TestRunErrorCodes } from '../../domain/errors';
 import type { TestRunStopper } from '../../domain/ports';
 import { TestRun } from '../../domain/test-run';

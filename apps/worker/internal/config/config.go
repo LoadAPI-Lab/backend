@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -12,6 +13,9 @@ type Env struct {
 	RequestTimeout time.Duration
 	RedisURL       string
 	RabbitMQURL    string
+
+	OutboundAllowPrivateNetworks bool
+	OutboundAllowedHosts         []string
 }
 
 var current = Env{
@@ -36,11 +40,19 @@ func Load() error {
 		return err
 	}
 
+	allowPrivateNetworks, err := boolFromEnv("OUTBOUND_ALLOW_PRIVATE_NETWORKS", current.OutboundAllowPrivateNetworks)
+	if err != nil {
+		return err
+	}
+
 	current = Env{
 		MaxWorkers:     maxWorkers,
 		RequestTimeout: requestTimeout,
 		RedisURL:       stringFromEnv("REDIS_URL", current.RedisURL),
 		RabbitMQURL:    stringFromEnv("RABBITMQ_URL", current.RabbitMQURL),
+
+		OutboundAllowPrivateNetworks: allowPrivateNetworks,
+		OutboundAllowedHosts:         hostsFromEnv("OUTBOUND_ALLOWED_HOSTS"),
 	}
 	return nil
 }
@@ -76,4 +88,27 @@ func stringFromEnv(name, fallback string) string {
 		return raw
 	}
 	return fallback
+}
+
+func boolFromEnv(name string, fallback bool) (bool, error) {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return fallback, nil
+	}
+
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("%s must be true or false, got %q", name, raw)
+	}
+	return value, nil
+}
+
+func hostsFromEnv(name string) []string {
+	var hosts []string
+	for _, host := range strings.Split(os.Getenv(name), ",") {
+		if host = strings.ToLower(strings.TrimSpace(host)); host != "" {
+			hosts = append(hosts, host)
+		}
+	}
+	return hosts
 }

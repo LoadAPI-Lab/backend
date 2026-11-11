@@ -1,4 +1,6 @@
-import { HttpMethod, TEST_RUN_STATUSES, TestRunStatus, TestType } from './constants';
+import { HttpMethod } from '@shared/constants';
+
+import { TEST_RUN_STATUSES, TestRunStatus, TestType } from './constants';
 import type { SingleConfig } from './schemas';
 import { TestRun } from './test-run';
 

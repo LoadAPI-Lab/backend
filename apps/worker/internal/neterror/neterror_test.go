@@ -1,4 +1,4 @@
-package load
+package neterror
 
 import (
 	"errors"
@@ -9,16 +9,18 @@ import (
 	"runtime"
 	"testing"
 	"time"
+	"worker/internal/config"
+	"worker/internal/httpclient"
 )
 
-func TestClassifyError(t *testing.T) {
+func TestClassify(t *testing.T) {
 	client := &http.Client{Timeout: 100 * time.Millisecond}
 
 	tests := []struct {
 		name        string
 		windowsSkip bool
 		request     func(t *testing.T) error
-		want        NetworkError
+		want        Category
 	}{
 		{
 			name: "timeout",
@@ -30,7 +32,7 @@ func TestClassifyError(t *testing.T) {
 				_, err := client.Get(server.URL)
 				return err
 			},
-			want: ErrorTimeout,
+			want: Timeout,
 		},
 		{
 			name: "dns",
@@ -38,7 +40,7 @@ func TestClassifyError(t *testing.T) {
 				_, err := client.Get("http://nonexistent-host.invalid")
 				return err
 			},
-			want: ErrorDNS,
+			want: DNS,
 		},
 		{
 			name:        "connection refused",
@@ -53,7 +55,7 @@ func TestClassifyError(t *testing.T) {
 				_, err = client.Get("http://" + addr)
 				return err
 			},
-			want: ErrorConnectionRefused,
+			want: ConnectionRefused,
 		},
 		{
 			name: "connection closed without response",
@@ -66,14 +68,33 @@ func TestClassifyError(t *testing.T) {
 				_, err := client.Get(server.URL)
 				return err
 			},
-			want: ErrorConnectionReset,
+			want: ConnectionReset,
+		},
+		{
+			name: "blocked",
+			request: func(t *testing.T) error {
+				t.Setenv("OUTBOUND_ALLOW_PRIVATE_NETWORKS", "false")
+				t.Cleanup(func() {
+					if err := config.Load(); err != nil {
+						t.Error(err)
+					}
+				})
+				if err := config.Load(); err != nil {
+					t.Fatal(err)
+				}
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+				t.Cleanup(server.Close)
+				_, err := httpclient.New().Get(server.URL)
+				return err
+			},
+			want: Blocked,
 		},
 		{
 			name: "other",
 			request: func(t *testing.T) error {
 				return fmt.Errorf("wrapped: %w", errors.New("something unexpected"))
 			},
-			want: ErrorOther,
+			want: Other,
 		},
 	}
 
@@ -87,8 +108,8 @@ func TestClassifyError(t *testing.T) {
 			if err == nil {
 				t.Fatal("request succeeded, want error")
 			}
-			if got := ClassifyError(err); got != tt.want {
-				t.Errorf("ClassifyError(%v) = %q, want %q", err, got, tt.want)
+			if got := Classify(err); got != tt.want {
+				t.Errorf("Classify(%v) = %q, want %q", err, got, tt.want)
 			}
 		})
 	}

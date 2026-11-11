@@ -1,5 +1,6 @@
+import { HttpMethod } from '@shared/constants';
+
 import { maskTestRunConfig } from './config-masking';
-import { HttpMethod } from './constants';
 import type { ScenarioConfig, SingleConfig } from './schemas';
 
 const BEARER_SECRET = 'eyJhbGciOiJIUzI1NiJ9.payload.signature';

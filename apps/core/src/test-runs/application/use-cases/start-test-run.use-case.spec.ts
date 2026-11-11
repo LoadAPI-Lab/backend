@@ -1,10 +1,10 @@
 import type { ConfigService } from '@nestjs/config';
+import { HttpMethod } from '@shared/constants';
 import { isBaseExceptionWithCode } from '@shared/error';
 
 import { hashTestConfig } from '../../domain/config-hash';
 import {
     CreateTestRunOutcome,
-    HttpMethod,
     MAX_PAGE_LIMIT,
     TestRunStatus,
     TestType,

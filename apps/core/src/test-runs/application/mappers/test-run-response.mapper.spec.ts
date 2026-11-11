@@ -1,12 +1,7 @@
 import { Logger } from '@nestjs/common';
+import { HttpMethod } from '@shared/constants';
 
-import {
-    HttpMethod,
-    MASKED_VALUE,
-    StepStatus,
-    TestRunStatus,
-    TestType,
-} from '../../domain/constants';
+import { MASKED_VALUE, StepStatus, TestRunStatus, TestType } from '../../domain/constants';
 import { TestRun } from '../../domain/test-run';
 import { toTestRunListItem, toTestRunResponse } from './test-run-response.mapper';
 

@@ -1,7 +1,8 @@
 import type { ConfigService } from '@nestjs/config';
+import { HttpMethod } from '@shared/constants';
 import { isBaseExceptionWithCode } from '@shared/error';
 
-import { CreateTestRunOutcome, HttpMethod, TestRunStatus, TestType } from '../../domain/constants';
+import { CreateTestRunOutcome, TestRunStatus, TestType } from '../../domain/constants';
 import { TestRunErrorCodes } from '../../domain/errors';
 import type { TestJob, WorkerOrchestrator } from '../../domain/ports';
 import type { SingleConfig } from '../../domain/schemas';

@@ -1,4 +1,6 @@
-import { HttpMethod, TestType } from '../constants';
+import { HttpMethod } from '@shared/constants';
+
+import { TestType } from '../constants';
 import { testConfigSchema } from './test-config.schema';
 
 const SINGLE_CONFIG = {

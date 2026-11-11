@@ -1,6 +1,7 @@
+import { HttpMethod } from '@shared/constants';
 import { EMPTY } from 'rxjs';
 
-import { HttpMethod, TestRunStatus, TestType, WorkerEventType } from '../../domain/constants';
+import { TestRunStatus, TestType, WorkerEventType } from '../../domain/constants';
 import type { LiveFeed } from '../../domain/ports';
 import type { SingleConfig } from '../../domain/schemas';
 import { TestRun } from '../../domain/test-run';
