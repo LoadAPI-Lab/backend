@@ -1,7 +1,7 @@
+import { scenarioConfigSchema } from '@shared/scenario';
 import { z } from 'zod/v4';
 
 import { TestType } from '../constants';
-import { scenarioConfigSchema } from './scenario-config.schema';
 import { singleConfigSchema } from './single-config.schema';
 
 export const testConfigSchema = z.discriminatedUnion('type', [

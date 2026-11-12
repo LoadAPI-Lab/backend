@@ -1,8 +1,9 @@
 import { users } from '@core/users/infrastructure/persistence/models';
+import type { ScenarioConfig } from '@shared/scenario';
 import { isNotNull } from 'drizzle-orm';
 import { index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
-import type { ScenarioConfig, SingleConfig } from '../../../domain/schemas';
+import type { SingleConfig } from '../../../domain/schemas';
 import { testRunStatusEnum, testTypeEnum } from './enums';
 
 export const IDEMPOTENCY_KEY_UNIQUE_INDEX = 'test_runs_user_idempotency_key_uidx';

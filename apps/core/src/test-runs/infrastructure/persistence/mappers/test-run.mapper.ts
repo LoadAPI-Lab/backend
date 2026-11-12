@@ -1,4 +1,6 @@
-import type { ScenarioConfig, SingleConfig } from '../../../domain/schemas';
+import type { ScenarioConfig } from '@shared/scenario';
+
+import type { SingleConfig } from '../../../domain/schemas';
 import { TestRun } from '../../../domain/test-run';
 import type { testRuns } from '../models';
 
