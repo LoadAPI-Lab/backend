@@ -1,8 +1,8 @@
+import { httpRequestSchema } from '@shared/http-request';
 import { z } from 'zod/v4';
 
-import { MAX_SCENARIO_STEPS } from '../constants';
-import { missingVariablesByStep } from '../validation';
-import { targetSchema } from './target.schema';
+import { MAX_SCENARIO_STEPS } from './scenario-limits';
+import { missingVariablesByStep } from './scenario-variables';
 
 const MIN_SCENARIO_STEPS = 1;
 const MIN_EXTRACT_PATH_LENGTH = 1;
@@ -14,7 +14,7 @@ const extractRuleSchema = z.object({
 });
 
 const stepSchema = z.object({
-    target: targetSchema,
+    target: httpRequestSchema,
     extract: z.array(extractRuleSchema).optional(),
 });
 

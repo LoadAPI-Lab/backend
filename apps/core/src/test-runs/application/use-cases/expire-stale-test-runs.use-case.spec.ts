@@ -1,11 +1,12 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpMethod } from '@shared/constants';
+import type { ScenarioConfig } from '@shared/scenario';
 import { EMPTY, type Observable } from 'rxjs';
 
 import { TestRunFailureReason, TestRunStatus, TestType } from '../../domain/constants';
 import type { LiveEvent, LiveFeed, TestRunStopper } from '../../domain/ports';
-import type { ScenarioConfig, SingleConfig } from '../../domain/schemas';
+import type { SingleConfig } from '../../domain/schemas';
 import { TestRun } from '../../domain/test-run';
 import { InMemoryTestRunsRepository } from '../../testing';
 import { ExpireStaleTestRunsUseCase } from './expire-stale-test-runs.use-case';

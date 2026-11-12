@@ -1,5 +1,7 @@
+import type { ScenarioConfig } from '@shared/scenario';
+
 import { FINAL_STATUSES, TestRunStatus, TestType } from './constants';
-import type { ScenarioConfig, SingleConfig, TestConfigInput } from './schemas';
+import type { SingleConfig, TestConfigInput } from './schemas';
 
 export type TestRunConfig = SingleConfig | ScenarioConfig;
 

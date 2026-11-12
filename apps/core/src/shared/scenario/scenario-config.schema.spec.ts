@@ -1,7 +1,7 @@
 import { HttpMethod } from '@shared/constants';
 
-import { MAX_SCENARIO_STEPS } from '../constants';
 import { scenarioConfigSchema } from './scenario-config.schema';
+import { MAX_SCENARIO_STEPS } from './scenario-limits';
 
 const login = {
     target: { method: HttpMethod.POST, url: 'https://api.example.com/login' },

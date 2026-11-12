@@ -1,7 +1,8 @@
 import { HttpMethod } from '@shared/constants';
+import type { ScenarioConfig } from '@shared/scenario';
 
 import { maskTestRunConfig } from './config-masking';
-import type { ScenarioConfig, SingleConfig } from './schemas';
+import type { SingleConfig } from './schemas';
 
 const BEARER_SECRET = 'eyJhbGciOiJIUzI1NiJ9.payload.signature';
 const RAW_AUTH_SECRET = 'raw-auth-secret-value';
