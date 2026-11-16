@@ -164,4 +164,31 @@ describe('HandleWorkerEventUseCase', () => {
         const stored = await repository.findById(TEST_ID);
         expect(stored?.status).toBe(TestRunStatus.PENDING);
     });
+
+    it('applies finished that raced a concurrent started instead of dropping the result', async () => {
+        class RacingRepository extends InMemoryTestRunsRepository {
+            private raced = false;
+
+            override async updateIfStatus(run: TestRun, expected: TestRunStatus) {
+                if (!this.raced) {
+                    this.raced = true;
+                    const concurrent = restoreRun(TestRunStatus.PENDING);
+                    concurrent.markStarted(EVENT_STARTED_AT);
+                    await super.updateIfStatus(concurrent, TestRunStatus.PENDING);
+                    return false;
+                }
+                return super.updateIfStatus(run, expected);
+            }
+        }
+        const racing = new RacingRepository().seed(restoreRun(TestRunStatus.PENDING));
+        const racingUseCase = new HandleWorkerEventUseCase(racing, noopLiveFeed);
+
+        await expect(racingUseCase.execute(COMPLETED_EVENT)).resolves.toBe(
+            WorkerEventOutcome.APPLIED,
+        );
+
+        const stored = await racing.findById(TEST_ID);
+        expect(stored?.status).toBe(TestRunStatus.COMPLETED);
+        expect(stored?.result).toEqual(RESULT);
+    });
 });
