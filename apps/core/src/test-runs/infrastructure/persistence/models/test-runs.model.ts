@@ -1,3 +1,4 @@
+import { scenarios } from '@core/scenarios/infrastructure/persistence/models';
 import { users } from '@core/users/infrastructure/persistence/models';
 import type { ScenarioConfig } from '@shared/scenario';
 import { isNotNull } from 'drizzle-orm';
@@ -20,6 +21,7 @@ export const testRuns = pgTable(
         config: jsonb().$type<SingleConfig | ScenarioConfig>().notNull(),
         configHash: text(),
         idempotencyKey: text(),
+        scenarioId: uuid().references(() => scenarios.id, { onDelete: 'set null' }),
         reason: text(),
         result: jsonb().$type<unknown>(),
         createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

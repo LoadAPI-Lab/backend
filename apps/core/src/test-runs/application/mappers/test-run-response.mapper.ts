@@ -73,6 +73,9 @@ const toBaseFields = (run: TestRun) => ({
     ...(run.startedAt !== undefined && { startedAt: run.startedAt.toISOString() }),
     ...(run.finishedAt !== undefined && { finishedAt: run.finishedAt.toISOString() }),
     ...(run.reason !== undefined && { reason: run.reason }),
+    ...(run.scenario !== undefined && {
+        scenario: { id: run.scenario.id, name: run.scenario.name },
+    }),
 });
 
 export const toTestRunListItem = (run: TestRun): TestRunListItem => {

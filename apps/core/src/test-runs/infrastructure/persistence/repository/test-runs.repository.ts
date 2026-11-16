@@ -1,3 +1,4 @@
+import { scenarios } from '@core/scenarios/infrastructure/persistence/models';
 import { DATABASE_SERVICE, type DatabaseService } from '@libs/database';
 import { Inject, Injectable } from '@nestjs/common';
 import * as schema from '@shared/entities';
@@ -10,7 +11,7 @@ import {
     type TestRunStatus,
 } from '../../../domain/constants';
 import { TestRunsRepository, type TestRunPageQuery } from '../../../domain/repositories';
-import type { TestRun } from '../../../domain/test-run';
+import type { TestRun, TestRunScenario } from '../../../domain/test-run';
 import { toDomainTestRun, toTestRunRow } from '../mappers';
 import { IDEMPOTENCY_KEY_UNIQUE_INDEX, testRuns } from '../models';
 
@@ -30,6 +31,14 @@ const isIdempotencyKeyViolation = (error: unknown): boolean => {
         cause.constraint_name === IDEMPOTENCY_KEY_UNIQUE_INDEX
     );
 };
+
+const fromJoinedRow = ({
+    run,
+    scenarioName,
+}: {
+    run: typeof testRuns.$inferSelect;
+    scenarioName: string | null;
+}): TestRun => toDomainTestRun(run, scenarioName);
 
 @Injectable()
 export class TestRunsRepositoryImpl implements TestRunsRepository {
@@ -85,17 +94,12 @@ export class TestRunsRepositoryImpl implements TestRunsRepository {
     }
 
     async findActive(): Promise<TestRun[]> {
-        const rows = await this.db
-            .select()
-            .from(testRuns)
-            .where(inArray(testRuns.status, ACTIVE_STATUSES));
-        return rows.map(toDomainTestRun);
+        const rows = await this.selectRuns().where(inArray(testRuns.status, ACTIVE_STATUSES));
+        return rows.map(fromJoinedRow);
     }
 
     async findPage({ userId, limit, cursor, status, type }: TestRunPageQuery): Promise<TestRun[]> {
-        const rows = await this.db
-            .select()
-            .from(testRuns)
+        const rows = await this.selectRuns()
             .where(
                 and(
                     eq(testRuns.userId, userId),
@@ -107,18 +111,30 @@ export class TestRunsRepositoryImpl implements TestRunsRepository {
             )
             .orderBy(desc(testRuns.createdAt), desc(testRuns.id))
             .limit(limit + NEXT_PAGE_PROBE_ROWS);
-        return rows.map(toDomainTestRun);
+        return rows.map(fromJoinedRow);
+    }
+
+    async findScenarioForUser(scenarioId: string, userId: string): Promise<TestRunScenario | null> {
+        const [row] = await this.db
+            .select({ id: scenarios.id, name: scenarios.name })
+            .from(scenarios)
+            .where(and(eq(scenarios.id, scenarioId), eq(scenarios.userId, userId)))
+            .limit(SINGLE_ROW_LIMIT);
+        return row ?? null;
+    }
+
+    private selectRuns() {
+        return this.db
+            .select({ run: testRuns, scenarioName: scenarios.name })
+            .from(testRuns)
+            .leftJoin(scenarios, eq(testRuns.scenarioId, scenarios.id));
     }
 
     private async findOne(condition: SQL | undefined): Promise<TestRun | null> {
-        const [row] = await this.db
-            .select()
-            .from(testRuns)
-            .where(condition)
-            .limit(SINGLE_ROW_LIMIT);
+        const [row] = await this.selectRuns().where(condition).limit(SINGLE_ROW_LIMIT);
         if (!row) {
             return null;
         }
-        return toDomainTestRun(row);
+        return fromJoinedRow(row);
     }
 }

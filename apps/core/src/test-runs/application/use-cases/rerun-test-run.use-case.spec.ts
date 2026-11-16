@@ -15,6 +15,7 @@ const TEST_ID = 'b3f1c2d4-7a1e-4f0b-9c3a-2e8d5f6a7b90';
 const OWNER_ID = '5d7e9a10-3c4b-4e2f-8a1d-6b9c0e2f4a13';
 const OTHER_USER_ID = 'e1a2b3c4-5d6e-4f70-8a9b-0c1d2e3f4a5b';
 const MAX_CONCURRENT_TESTS = 10;
+const SCENARIO_RUN_ID = 'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6';
 
 const storedConfig: SingleConfig = {
     target: {
@@ -94,5 +95,24 @@ describe('RerunTestRunUseCase', () => {
             { testId: response.id, type: TestType.SINGLE, config: storedConfig },
         ]);
         expect(repository.created.map((run) => run.userId)).toEqual([OWNER_ID]);
+    });
+
+    it('keeps the link to the saved scenario', async () => {
+        const scenario = { id: 'c4d5e6f7-8a9b-4c0d-9e1f-2a3b4c5d6e7f', name: 'Checkout' };
+        repository.seedScenario({ ...scenario, userId: OWNER_ID }).seed(
+            TestRun.restore({
+                id: SCENARIO_RUN_ID,
+                userId: OWNER_ID,
+                type: TestType.SCENARIO,
+                status: TestRunStatus.COMPLETED,
+                config: { steps: [{ target: { method: HttpMethod.GET, url: 'https://a.test' } }] },
+                createdAt: new Date('2026-01-01T00:00:00.000Z'),
+                scenario,
+            }),
+        );
+
+        await useCase.execute(SCENARIO_RUN_ID, OWNER_ID);
+
+        expect(repository.created.map((run) => run.scenario)).toEqual([scenario]);
     });
 });
