@@ -13,6 +13,9 @@ export const WorkerEventOutcome = {
 } as const;
 export type WorkerEventOutcome = (typeof WorkerEventOutcome)[keyof typeof WorkerEventOutcome];
 
+const MAX_ATTEMPTS = 3;
+const RACED = 'raced';
+
 @Injectable()
 export class HandleWorkerEventUseCase {
     constructor(
@@ -21,6 +24,16 @@ export class HandleWorkerEventUseCase {
     ) {}
 
     async execute(event: WorkerEvent): Promise<WorkerEventOutcome> {
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+            const outcome = await this.apply(event);
+            if (outcome !== RACED) {
+                return outcome;
+            }
+        }
+        return WorkerEventOutcome.IGNORED;
+    }
+
+    private async apply(event: WorkerEvent): Promise<WorkerEventOutcome | typeof RACED> {
         const run = await this.repository.findById(event.testId);
         if (!run) {
             return WorkerEventOutcome.UNKNOWN_TEST_RUN;
@@ -37,7 +50,7 @@ export class HandleWorkerEventUseCase {
 
         const updated = await this.repository.updateIfStatus(run, previousStatus);
         if (!updated) {
-            return WorkerEventOutcome.IGNORED;
+            return RACED;
         }
 
         this.liveFeed.publishStatus(run.id, run.status, run.reason);

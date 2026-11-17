@@ -64,7 +64,7 @@ const scenarioBodySchema = z
             'Scenario config, validated with the same rules as starting a scenario test run',
         ),
     })
-    .meta({ example: scenarioBodyExample, examples: [scenarioBodyExample] });
+    .meta({ example: scenarioBodyExample });
 
 export class CreateScenarioDto extends createZodDto(scenarioBodySchema) {}
 
