@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { hashTestConfig } from '../../domain/config-hash';
-import { CreateTestRunOutcome, TestRunStatus } from '../../domain/constants';
+import { CreateTestRunOutcome, TestRunStatus, TestType } from '../../domain/constants';
 import { TestRunErrorCodes, testRunException } from '../../domain/errors';
 import { WorkerOrchestrator } from '../../domain/ports';
 import { TestRunsRepository } from '../../domain/repositories';
@@ -31,6 +31,7 @@ export class StartTestRunUseCase {
         input: TestConfigInput,
         userId: string,
         idempotencyKey?: string,
+        scenarioId?: string,
     ): Promise<StartTestRunResponse> {
         const configHash = hashTestConfig(input);
 
@@ -46,7 +47,11 @@ export class StartTestRunUseCase {
             throw testRunException(TestRunErrorCodes.CAPACITY_EXCEEDED);
         }
 
-        const run = TestRun.create({ ...input, userId, configHash, idempotencyKey });
+        const scenario =
+            scenarioId !== undefined && input.type === TestType.SCENARIO
+                ? ((await this.repository.findScenarioForUser(scenarioId, userId)) ?? undefined)
+                : undefined;
+        const run = TestRun.create({ ...input, userId, configHash, idempotencyKey, scenario });
         const outcome = await this.repository.create(run);
         if (outcome === CreateTestRunOutcome.IDEMPOTENCY_KEY_CONFLICT) {
             return this.replayConflicting(userId, configHash, idempotencyKey);

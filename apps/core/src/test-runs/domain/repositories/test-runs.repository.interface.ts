@@ -1,5 +1,5 @@
 import type { CreateTestRunOutcome, TestRunStatus, TestType } from '../constants';
-import type { TestRun } from '../test-run';
+import type { TestRun, TestRunScenario } from '../test-run';
 
 export interface TestRunPageCursor {
     readonly createdAt: string;
@@ -23,4 +23,8 @@ export abstract class TestRunsRepository {
     abstract countActive(): Promise<number>;
     abstract findActive(): Promise<TestRun[]>;
     abstract findPage(query: TestRunPageQuery): Promise<TestRun[]>;
+    abstract findScenarioForUser(
+        scenarioId: string,
+        userId: string,
+    ): Promise<TestRunScenario | null>;
 }

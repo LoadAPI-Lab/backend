@@ -30,6 +30,13 @@ const input: TestConfigInput = {
     },
 };
 
+const SCENARIO = { id: 'c4d5e6f7-8a9b-4c0d-9e1f-2a3b4c5d6e7f', name: 'Checkout' };
+
+const scenarioInput: TestConfigInput = {
+    type: TestType.SCENARIO,
+    config: { steps: [{ target: { method: HttpMethod.GET, url: 'https://api.example.com/me' } }] },
+};
+
 const otherInput: TestConfigInput = {
     type: TestType.SINGLE,
     config: { ...input.config, targetRps: 20 },
@@ -169,6 +176,37 @@ describe('StartTestRunUseCase', () => {
         expect(response).toEqual({ id: existing.id, status: TestRunStatus.PENDING });
         expect(repository.created).toEqual([]);
         expect(orchestrator.jobs).toEqual([]);
+    });
+
+    it("links a scenario run to the user's saved scenario and keeps it out of the job", async () => {
+        const repository = new RecordingTestRunsRepository().seedScenario({
+            ...SCENARIO,
+            userId: OWNER_ID,
+        });
+
+        const response = await useCaseWith(repository).execute(
+            scenarioInput,
+            OWNER_ID,
+            undefined,
+            SCENARIO.id,
+        );
+
+        expect(repository.created.map((run) => run.scenario)).toEqual([SCENARIO]);
+        expect(orchestrator.jobs).toEqual([{ testId: response.id, ...scenarioInput }]);
+    });
+
+    it("ignores a scenario id that isn't the user's or a single run", async () => {
+        const repository = new RecordingTestRunsRepository().seedScenario({
+            ...SCENARIO,
+            userId: OTHER_USER_ID,
+        });
+        const useCase = useCaseWith(repository);
+
+        await useCase.execute(scenarioInput, OWNER_ID, undefined, SCENARIO.id);
+        await useCase.execute(input, OTHER_USER_ID, undefined, SCENARIO.id);
+
+        expect(repository.created.map((run) => run.scenario)).toEqual([undefined, undefined]);
+        expect(orchestrator.jobs).toHaveLength(2);
     });
 
     it('replays a key without checking the capacity', async () => {

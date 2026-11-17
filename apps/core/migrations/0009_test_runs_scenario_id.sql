@@ -1,0 +1,2 @@
+ALTER TABLE "test_runs" ADD COLUMN "scenario_id" uuid;
+ALTER TABLE "test_runs" ADD CONSTRAINT "test_runs_scenario_id_scenarios_id_fk" FOREIGN KEY ("scenario_id") REFERENCES "public"."scenarios"("id") ON DELETE set null ON UPDATE no action;

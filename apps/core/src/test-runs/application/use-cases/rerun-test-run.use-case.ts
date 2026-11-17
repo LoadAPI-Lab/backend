@@ -23,6 +23,6 @@ export class RerunTestRunUseCase {
             throw testRunException(TestRunErrorCodes.NOT_FOUND);
         }
 
-        return this.startTestRun.execute(run.configInput, userId, idempotencyKey);
+        return this.startTestRun.execute(run.configInput, userId, idempotencyKey, run.scenario?.id);
     }
 }

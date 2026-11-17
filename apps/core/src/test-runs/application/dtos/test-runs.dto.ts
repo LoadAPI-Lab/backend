@@ -1,4 +1,5 @@
 import { HTTP_METHODS } from '@shared/constants';
+import { scenarioConfigSchema } from '@shared/scenario';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod/v4';
 
@@ -8,11 +9,12 @@ import {
     MIN_PAGE_LIMIT,
     TEST_RUN_STATUSES,
     TEST_TYPES,
+    TestType,
 } from '../../domain/constants';
 import {
     loadTestResultSchema,
     scenarioResultSchema,
-    testConfigSchema,
+    singleConfigSchema,
     type TestConfigInput,
 } from '../../domain/schemas';
 
@@ -26,10 +28,37 @@ const testRunParamsSchema = z.object({
 
 export class TestRunParamsDto extends createZodDto(testRunParamsSchema) {}
 
-export const StartTestRunDto = Object.defineProperty(createZodDto(testConfigSchema), 'name', {
+const scenarioIdSchema = z.uuid().describe('Saved scenario id');
+
+const startTestRunSchema = z.discriminatedUnion('type', [
+    z.object({ type: z.literal(TestType.SINGLE), config: singleConfigSchema }),
+    z.object({
+        type: z.literal(TestType.SCENARIO),
+        config: scenarioConfigSchema,
+        scenarioId: scenarioIdSchema
+            .optional()
+            .describe(
+                'Saved scenario this run is started from. The run links to it while it exists; ' +
+                    'an id the user has no scenario with is ignored. The config is always taken ' +
+                    'from `config`, not from the saved scenario',
+            ),
+    }),
+]);
+
+export const StartTestRunDto = Object.defineProperty(createZodDto(startTestRunSchema), 'name', {
     value: 'StartTestRunDto',
 });
-export type StartTestRunDto = TestConfigInput;
+export type StartTestRunDto = z.infer<typeof startTestRunSchema>;
+
+export const splitStartTestRun = (
+    dto: StartTestRunDto,
+): { input: TestConfigInput; scenarioId?: string } => {
+    if (dto.type === TestType.SCENARIO) {
+        const { scenarioId, ...input } = dto;
+        return { input, ...(scenarioId !== undefined && { scenarioId }) };
+    }
+    return { input: dto };
+};
 
 const startTestRunResponseSchema = z.object({
     id: testRunIdSchema,
@@ -120,6 +149,16 @@ const testRunBaseShape = {
     startedAt: z.iso.datetime().optional().describe('Start time, ISO 8601'),
     finishedAt: z.iso.datetime().optional().describe('Finish time, ISO 8601'),
     reason: z.string().optional().describe('Failure reason, present on FAILED runs'),
+    scenario: z
+        .object({
+            id: scenarioIdSchema,
+            name: z.string().describe('Current scenario name'),
+        })
+        .optional()
+        .describe(
+            'Saved scenario the run was started from, present on scenario runs while that ' +
+                'scenario exists',
+        ),
 };
 
 const testRunListItemSchema = z.object({
