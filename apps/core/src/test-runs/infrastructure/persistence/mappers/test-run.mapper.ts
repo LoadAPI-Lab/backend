@@ -7,7 +7,7 @@ import type { testRuns } from '../models';
 type TestRunRow = typeof testRuns.$inferSelect;
 type TestRunInsert = typeof testRuns.$inferInsert;
 
-export function toDomainTestRun(row: TestRunRow): TestRun {
+export function toDomainTestRun(row: TestRunRow, scenarioName?: string | null): TestRun {
     return TestRun.restore({
         id: row.id,
         userId: row.userId,
@@ -17,6 +17,8 @@ export function toDomainTestRun(row: TestRunRow): TestRun {
         createdAt: row.createdAt,
         configHash: row.configHash ?? undefined,
         idempotencyKey: row.idempotencyKey ?? undefined,
+        scenario:
+            row.scenarioId && scenarioName ? { id: row.scenarioId, name: scenarioName } : undefined,
         reason: row.reason ?? undefined,
         result: row.result ?? undefined,
         startedAt: row.startedAt ?? undefined,
@@ -34,6 +36,7 @@ export function toTestRunRow(run: TestRun): TestRunInsert {
         createdAt: run.createdAt,
         configHash: run.configHash ?? null,
         idempotencyKey: run.idempotencyKey ?? null,
+        scenarioId: run.scenario?.id ?? null,
         reason: run.reason ?? null,
         result: run.result ?? null,
         startedAt: run.startedAt ?? null,

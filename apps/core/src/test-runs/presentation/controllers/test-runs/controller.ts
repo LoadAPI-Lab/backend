@@ -20,6 +20,7 @@ import {
     StartTestRunDto,
     type StartTestRunResponse,
     type StopTestRunResponse,
+    splitStartTestRun,
     TestRunParamsDto,
     type TestRunResponse,
 } from '../../../application/dtos';
@@ -62,7 +63,8 @@ export class TestRunsController {
         @CurrentUser() user: AuthenticatedUser,
         @IdempotencyKey() idempotencyKey: string | undefined,
     ): Promise<StartTestRunResponse> {
-        return this.startTestRun.execute(dto, user.id, idempotencyKey);
+        const { input, scenarioId } = splitStartTestRun(dto);
+        return this.startTestRun.execute(input, user.id, idempotencyKey, scenarioId);
     }
 
     @Get()

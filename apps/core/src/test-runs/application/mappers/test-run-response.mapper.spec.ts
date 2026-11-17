@@ -134,7 +134,9 @@ const singleRun = (status: TestRunStatus, extra: RunExtra = {}) =>
         ...extra,
     });
 
-const scenarioRun = (result: unknown) =>
+const SCENARIO = { id: 'c4d5e6f7-8a9b-4c0d-9e1f-2a3b4c5d6e7f', name: 'Checkout' };
+
+const scenarioRun = (result: unknown, scenario?: { id: string; name: string }) =>
     TestRun.restore({
         id: TEST_ID,
         userId: USER_ID,
@@ -145,6 +147,7 @@ const scenarioRun = (result: unknown) =>
         startedAt: STARTED_AT,
         finishedAt: FINISHED_AT,
         result,
+        scenario,
     });
 
 const completedSingleRun = (result: unknown) =>
@@ -208,6 +211,16 @@ describe('test run response mapper', () => {
             expect(item).not.toHaveProperty('request');
             expect(item).not.toHaveProperty('targetRps');
             expect(item).not.toHaveProperty('p95Ms');
+        });
+
+        it('includes the linked saved scenario of a scenario run', () => {
+            expect(toTestRunListItem(scenarioRun(scenarioResult, SCENARIO)).scenario).toEqual(
+                SCENARIO,
+            );
+            expect(toTestRunResponse(scenarioRun(scenarioResult, SCENARIO)).scenario).toEqual(
+                SCENARIO,
+            );
+            expect(toTestRunListItem(scenarioRun(scenarioResult))).not.toHaveProperty('scenario');
         });
 
         it('keeps the reason of a FAILED run', () => {

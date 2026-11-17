@@ -4,7 +4,7 @@ import type {
     TestRunPageQuery,
     TestRunsRepository,
 } from '../domain/repositories';
-import { TestRun } from '../domain/test-run';
+import { TestRun, type TestRunScenario } from '../domain/test-run';
 
 const NEXT_PAGE_PROBE_ROWS = 1;
 const PAGE_START = 0;
@@ -25,6 +25,7 @@ const copyOf = (run: TestRun): TestRun =>
         createdAt: run.createdAt,
         configHash: run.configHash,
         idempotencyKey: run.idempotencyKey,
+        scenario: run.scenario,
         reason: run.reason,
         result: run.result,
         startedAt: run.startedAt,
@@ -54,6 +55,12 @@ export class InMemoryTestRunsRepository implements TestRunsRepository {
     rejectUpdates = false;
 
     private readonly runs = new Map<string, TestRun>();
+    private readonly scenarios = new Map<string, TestRunScenario & { userId: string }>();
+
+    seedScenario(scenario: TestRunScenario & { userId: string }): this {
+        this.scenarios.set(scenario.id, scenario);
+        return this;
+    }
 
     seed(...runs: TestRun[]): this {
         for (const run of runs) {
@@ -128,6 +135,14 @@ export class InMemoryTestRunsRepository implements TestRunsRepository {
             .sort(newestFirst)
             .slice(PAGE_START, limit + NEXT_PAGE_PROBE_ROWS)
             .map(copyOf);
+    }
+
+    async findScenarioForUser(scenarioId: string, userId: string): Promise<TestRunScenario | null> {
+        const scenario = this.scenarios.get(scenarioId);
+        if (scenario?.userId !== userId) {
+            return null;
+        }
+        return { id: scenario.id, name: scenario.name };
     }
 
     private activeRuns(): TestRun[] {

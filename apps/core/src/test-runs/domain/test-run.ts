@@ -5,6 +5,11 @@ import type { SingleConfig, TestConfigInput } from './schemas';
 
 export type TestRunConfig = SingleConfig | ScenarioConfig;
 
+export interface TestRunScenario {
+    readonly id: string;
+    readonly name: string;
+}
+
 const MS_PER_SECOND = 1000;
 
 interface TestRunState {
@@ -15,6 +20,7 @@ interface TestRunState {
     readonly createdAt: Date;
     readonly configHash?: string;
     readonly idempotencyKey?: string;
+    readonly scenario?: TestRunScenario;
     status: TestRunStatus;
     reason?: string;
     result?: unknown;
@@ -42,6 +48,7 @@ export class TestRun {
             userId: string;
             configHash: string;
             idempotencyKey?: string;
+            scenario?: TestRunScenario;
             now?: Date;
         },
     ): TestRun {
@@ -53,6 +60,7 @@ export class TestRun {
             createdAt: input.now ?? new Date(),
             configHash: input.configHash,
             idempotencyKey: input.idempotencyKey,
+            scenario: input.scenario,
             status: TestRunStatus.PENDING,
         });
     }
@@ -66,6 +74,7 @@ export class TestRun {
         createdAt: Date;
         configHash?: string;
         idempotencyKey?: string;
+        scenario?: TestRunScenario;
         reason?: string;
         result?: unknown;
         startedAt?: Date;
@@ -110,6 +119,10 @@ export class TestRun {
 
     get idempotencyKey(): string | undefined {
         return this.state.idempotencyKey;
+    }
+
+    get scenario(): TestRunScenario | undefined {
+        return this.state.scenario;
     }
 
     get reason(): string | undefined {
